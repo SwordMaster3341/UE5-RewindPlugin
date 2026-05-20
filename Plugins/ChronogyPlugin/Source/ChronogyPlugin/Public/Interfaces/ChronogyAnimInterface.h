@@ -24,7 +24,7 @@ class CHRONOGYPLUGIN_API IChronogyAnimInterface
 
 public:
 
-	//Simple interface that allows animations to push each pose snapshot to the ChronogyComponent 
+	// Called each tick during rewind with the current blended pose. Store it and display it while bIsRewinding is true.
 	virtual void PushRewindPoseSnapshot(const FPoseSnapshot& Snapshot) = 0;
 
 	//Interface that flags when to switch between normal playback and rewinding

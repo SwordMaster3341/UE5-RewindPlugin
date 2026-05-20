@@ -35,22 +35,28 @@ public:
 
 	//Broadcasting events to registered components
 
+	UFUNCTION(BlueprintCallable, Category = "Chronogy")
 	void StartGlobalRewind();
+
+	UFUNCTION(BlueprintCallable, Category = "Chronogy")
 	void StopGlobalRewind();
 
 	UPROPERTY(EditDefaultsOnly, Category = "Chronogy")
 	float MaxRewindSecconds = 15.0f;
 
-	UPROPERTY(EditDefaultsOnly, Category = "Chronogy")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Chronogy")
 	float GlobalRewindSpeed = 1.0f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Chronogy")
 	float CurrentTimeDilation = 1.0f;
 
+	UFUNCTION(BlueprintCallable, Category = "Chronogy")
 	void SetTimeDilation(float Dilation);
+
+	UFUNCTION(BlueprintCallable, Category = "Chronogy")
 	void ResetTimeDilation();
 
-
+	UPROPERTY(BlueprintReadOnly, Category = "Chronogy")
 	bool bIsRewinding = false;
 
 	FOnGlobalRewindStarted OnRewindStarted;

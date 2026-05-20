@@ -22,12 +22,12 @@ class CHRONOGYPLUGIN_API IChronogySnapshotInterface
 
 public:
 
-	//Interface to capture the snapshots
+	// Called at each snapshot interval during normal play. Store current state into your buffer.
 	virtual void CaptureSnapshot() = 0;
 
-	//Interface to Apply snapshots
-	virtual void ApplySnapshot() = 0;
+	// Called every tick during rewind with the current rewind timestamp. Restore the state recorded at or before that time.
+	virtual void ApplySnapshot(float Timestamp) = 0;
 
-	//Interface to erase future snapshots when a new snapshot is captured while rewinding
-	virtual void EraseFutureSnapshots() = 0;
+	// Called when rewind ends. Discard any buffered states with a timestamp later than FromTimestamp.
+	virtual void EraseFutureSnapshots(float FromTimestamp) = 0;
 };

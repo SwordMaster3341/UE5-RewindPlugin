@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "Engine/EngineTypes.h"
+#include "Animation/PoseSnapshot.h"
 #include "ChronogyComponent.generated.h"
 
 
@@ -22,6 +23,8 @@
 //Forward Declerations
 
 class UChronogySubsystem;
+class UPrimitiveComponent;
+class UCharacterMovementComponent;
 class IChronogyAnimInterface;
 class IChronogySnapshotInterface;
 
@@ -30,14 +33,22 @@ USTRUCT()
 struct FChronogySnapshot
 {
 	GENERATED_BODY()
-	
+
 	float   Timestamp       = 0.0f;
 	FVector Location        = FVector::ZeroVector;
 	FQuat   Rotation        = FQuat::Identity;
 	FVector LinearVelocity  = FVector::ZeroVector;
 	FVector AngularVelocity = FVector::ZeroVector;
 	uint8   MovementMode    = 0;
+};
 
+USTRUCT()
+struct FChronogyPoseSnapshot
+{
+	GENERATED_BODY()
+
+	float         Timestamp    = 0.0f;
+	FPoseSnapshot PoseSnapshot;
 };
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
@@ -67,7 +78,19 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "Chronogy")
 	int32 MaxMemoryBytes = 2 * 1024 * 1024; //2MB is the defualt memory for snapshot storage and acts as a hard cap.
 
-public:	
+	// If the owner is a Character, also snapshot and restore CharacterMovementComponent velocity and mode.
+	UPROPERTY(EditDefaultsOnly, Category = "Chronogy")
+	bool bSnapshotMovementVelocityAndMode = false;
+
+	// Enable bone pose recording for animation rewind. Requires the anim instance to implement IChronogyAnimInterface.
+	UPROPERTY(EditDefaultsOnly, Category = "Chronogy")
+	bool bSnapshotBonePoses = false;
+
+	// Record a bone pose every N transform snapshots. Higher = less memory, less smooth anim rewind.
+	UPROPERTY(EditDefaultsOnly, Category = "Chronogy", meta = (EditCondition = "bSnapshotBonePoses", ClampMin = "1"))
+	int32 BoneSnapshotFrameInterval = 3;
+
+public:
 	void RecordSnapshot();
 	void ApplySnapshotAtTime(float Timestamp);
 	void EraseFutureSnapshots(float FromTimestamp);
@@ -83,11 +106,23 @@ public:
 	int32 MaxSnapshotCount = 0;
 	float LastRealTimeSeconds = 0.0f;
 
-	UFUNCTION()
-	void OnRewindStart();
+	// Cached owner component references
+	UPrimitiveComponent*         OwnerRootComponent      = nullptr;
+	UCharacterMovementComponent* OwnerMovementComponent  = nullptr;
+	USkeletalMeshComponent*      OwnerSkeletalMesh        = nullptr;
+	UChronogySubsystem*          Subsystem               = nullptr;
+
+	TArray<FChronogyPoseSnapshot> BonePoseBuffer;
+	int32 MaxBonePoseCount            = 0;
+	int32 FramesSinceLastBoneSnapshot = 0;
+
+	bool bPausedPhysics = false;
 
 	UFUNCTION()
-	void OnRewindEnd();
+	void OnRewindStarted();
+
+	UFUNCTION()
+	void OnRewindCompleted();
 
 		
 };
