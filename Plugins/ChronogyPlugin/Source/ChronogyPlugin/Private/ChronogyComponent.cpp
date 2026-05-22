@@ -144,9 +144,9 @@ void UChronogyComponent::OnRewindStarted()
 		OwnerRootComponent->SetSimulatePhysics(false);
 	}
 
-	if (IChronogyAnimInterface* AnimInterface = GetAnimInterface())
+	if (UAnimInstance* AnimInst = GetAnimInterface())
 	{
-		AnimInterface->SetIsRewinding(true);
+		IChronogyAnimInterface::Execute_SetIsRewinding(AnimInst, true);
 	}
 }
 
@@ -167,6 +167,10 @@ void UChronogyComponent::OnRewindCompleted()
 			{
 				OwnerRootComponent->SetPhysicsLinearVelocity(SnapshotBuffer[i].LinearVelocity);
 				OwnerRootComponent->SetPhysicsAngularVelocityInRadians(SnapshotBuffer[i].AngularVelocity);
+				if (OwnerMovementComponent)
+				{
+					OwnerMovementComponent->Velocity = SnapshotBuffer[i].LinearVelocity;
+				}
 				break;
 			}
 		}
@@ -177,19 +181,39 @@ void UChronogyComponent::OnRewindCompleted()
 
 	EraseFutureSnapshots(RewindPlaybackTime);
 
-	if (IChronogyAnimInterface* AnimInterface = GetAnimInterface())
+	if (UAnimInstance* AnimInst = GetAnimInterface())
 	{
-		AnimInterface->SetIsRewinding(false);
+		IChronogyAnimInterface::Execute_SetIsRewinding(AnimInst, false);
 	}
 }
 
-IChronogyAnimInterface* UChronogyComponent::GetAnimInterface() const
+UAnimInstance* UChronogyComponent::GetAnimInterface() const
 {
-	if (USkeletalMeshComponent* Mesh = GetOwner()->FindComponentByClass<USkeletalMeshComponent>())
+	USkeletalMeshComponent* Mesh = OwnerSkeletalMesh
+		? OwnerSkeletalMesh
+		: GetOwner()->FindComponentByClass<USkeletalMeshComponent>();
+
+	if (!Mesh)
 	{
-		return Cast<IChronogyAnimInterface>(Mesh->GetAnimInstance());
+		UE_LOG(LogChronogy, Warning, TEXT("[%s] GetAnimInterface: no SkeletalMeshComponent found."), *GetOwner()->GetName());
+		return nullptr;
 	}
-	return nullptr;
+
+	UAnimInstance* AnimInst = Mesh->GetAnimInstance();
+	if (!AnimInst)
+	{
+		UE_LOG(LogChronogy, Warning, TEXT("[%s] GetAnimInterface: GetAnimInstance() returned null."), *GetOwner()->GetName());
+		return nullptr;
+	}
+
+	const bool bImplements = AnimInst->GetClass()->ImplementsInterface(UChronogyAnimInterface::StaticClass());
+	if (!bImplements)
+	{
+		UE_LOG(LogChronogy, Warning, TEXT("[%s] GetAnimInterface: %s does not implement IChronogyAnimInterface."),
+			*GetOwner()->GetName(), *AnimInst->GetClass()->GetName());
+	}
+
+	return bImplements ? AnimInst : nullptr;
 }
 
 void UChronogyComponent::RecordSnapshot()
@@ -335,20 +359,20 @@ void UChronogyComponent::PlayBonePoseSnapshots()
 {
 	if (!bSnapshotBonePoses || BonePoseBuffer.Num() < 2) { return; }
 
-	IChronogyAnimInterface* AnimInterface = GetAnimInterface();
-	if (!AnimInterface) { return; }
+	UAnimInstance* AnimInst = GetAnimInterface();
+	if (!AnimInst) { return; }
 
 	// Clamp to oldest recorded pose
 	if (RewindPlaybackTime <= BonePoseBuffer[0].Timestamp)
 	{
-		AnimInterface->PushRewindPoseSnapshot(BonePoseBuffer[0].PoseSnapshot);
+		IChronogyAnimInterface::Execute_PushRewindPoseSnapshot(AnimInst, BonePoseBuffer[0].PoseSnapshot);
 		return;
 	}
 
 	// Clamp to newest recorded pose
 	if (RewindPlaybackTime >= BonePoseBuffer.Last().Timestamp)
 	{
-		AnimInterface->PushRewindPoseSnapshot(BonePoseBuffer.Last().PoseSnapshot);
+		IChronogyAnimInterface::Execute_PushRewindPoseSnapshot(AnimInst, BonePoseBuffer.Last().PoseSnapshot);
 		return;
 	}
 
@@ -380,5 +404,11 @@ void UChronogyComponent::PlayBonePoseSnapshots()
 			Alpha);
 	}
 
-	AnimInterface->PushRewindPoseSnapshot(BlendedPose);
+	if (CVarChronogyDebugAnim.GetValueOnGameThread())
+	{
+		UE_LOG(LogChronogy, Log, TEXT("[%s] PushRewindPoseSnapshot: T=%.3f  Alpha=%.3f  Bones=%d"),
+			*GetOwner()->GetName(), RewindPlaybackTime, Alpha, BoneCount);
+	}
+
+	IChronogyAnimInterface::Execute_PushRewindPoseSnapshot(AnimInst, BlendedPose);
 }

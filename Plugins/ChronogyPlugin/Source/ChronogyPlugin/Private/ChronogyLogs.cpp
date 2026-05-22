@@ -14,3 +14,9 @@ TAutoConsoleVariable<int32> CVarChronogyVerbose(
 	0,
 	TEXT("1 = log snapshot recording intervals, buffer overflow events, and playback progress"),
 	ECVF_Default);
+
+TAutoConsoleVariable<int32> CVarChronogyDebugAnim(
+	TEXT("Chronogy.DebugAnim"),
+	0,
+	TEXT("1 = log animation interface resolution and pose snapshot push events each rewind tick"),
+	ECVF_Default);

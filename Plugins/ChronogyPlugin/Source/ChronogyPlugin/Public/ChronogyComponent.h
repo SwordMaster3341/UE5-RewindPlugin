@@ -96,7 +96,7 @@ public:
 	void EraseFutureSnapshots(float FromTimestamp);
 	void PlayBonePoseSnapshots();
 
-	IChronogyAnimInterface* GetAnimInterface() const;
+	UAnimInstance* GetAnimInterface() const;
 
 	TArray<FChronogySnapshot>   SnapshotBuffer;
 	IChronogySnapshotInterface* SnapshotInterface = nullptr;

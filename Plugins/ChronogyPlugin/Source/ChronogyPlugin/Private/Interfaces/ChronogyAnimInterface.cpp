@@ -3,4 +3,3 @@
 
 #include "Interfaces/ChronogyAnimInterface.h"
 
-// Add default functionality here for any IChronogyAnimInterface functions that are not pure virtual.

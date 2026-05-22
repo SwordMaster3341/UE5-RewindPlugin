@@ -10,10 +10,6 @@ class UChronogyComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnGlobalRewindStarted);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnGlobalRewindCompleted);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnGlobalFastForwardStarted);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnGlobalFastForwardCompleted);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnGlobalTimeScrubStarted);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnGlobalTimeScrubCompleted);
 
 
 
@@ -40,9 +36,6 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Chronogy")
 	void StopGlobalRewind();
-
-	UPROPERTY(EditDefaultsOnly, Category = "Chronogy")
-	float MaxRewindSecconds = 15.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Chronogy")
 	float GlobalRewindSpeed = 1.0f;

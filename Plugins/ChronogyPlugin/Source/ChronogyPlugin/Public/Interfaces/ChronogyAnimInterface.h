@@ -25,10 +25,12 @@ class CHRONOGYPLUGIN_API IChronogyAnimInterface
 public:
 
 	// Called each tick during rewind with the current blended pose. Store it and display it while bIsRewinding is true.
-	virtual void PushRewindPoseSnapshot(const FPoseSnapshot& Snapshot) = 0;
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Chronogy")
+	void PushRewindPoseSnapshot(const FPoseSnapshot& Snapshot);
 
-	//Interface that flags when to switch between normal playback and rewinding
-	virtual void SetIsRewinding(bool bIsRewinding) = 0;
+	// Flags when to switch between normal playback and rewinding.
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Chronogy")
+	void SetIsRewinding(bool bIsRewinding);
 
 
 };
