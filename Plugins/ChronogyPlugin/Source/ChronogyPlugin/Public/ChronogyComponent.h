@@ -21,6 +21,10 @@
 class UChronogySubsystem;
 class UPrimitiveComponent;
 class UCharacterMovementComponent;
+class ULightComponent;
+class UMeshComponent;
+class UMaterialInterface;
+class UMaterialInstanceDynamic;
 class IChronogySnapshotInterface;
 
 USTRUCT()
@@ -43,6 +47,27 @@ struct FChronogyPoseSnapshot
 
 	float         Timestamp    = 0.0f;
 	FPoseSnapshot PoseSnapshot;
+};
+
+USTRUCT()
+struct FChronogyLightFrame
+{
+	GENERATED_BODY()
+
+	float        Timestamp  = 0.0f;
+	float        Intensity  = 0.0f;
+	FLinearColor LightColor = FLinearColor::White;
+};
+
+USTRUCT()
+struct FChronogyMaterialFrame
+{
+	GENERATED_BODY()
+
+	float                          Timestamp = 0.0f;
+	TWeakObjectPtr<UMaterialInterface> Material;
+	TArray<float>                  ScalarValues;
+	TArray<FLinearColor>           VectorValues;
 };
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
@@ -75,6 +100,10 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "Chronogy")
 	bool bSnapshotMovementVelocityAndMode = false;
 
+	// If this actor is spawned at runtime, automatically register its spawn time with ChronogySubsystem so it is destroyed on rewind past its birth. Uncheck for actors that should persist through rewind.
+	UPROPERTY(EditDefaultsOnly, Category = "Chronogy")
+	bool bShouldTrackSpawn = true;
+
 	// Enable bone pose recording for animation rewind. Requires the anim instance to implement IChronogyAnimInterface.
 	UPROPERTY(EditDefaultsOnly, Category = "Chronogy")
 	bool bSnapshotBonePoses = false;
@@ -82,6 +111,14 @@ public:
 	// Record a bone pose every N transform snapshots. Higher = less memory, less smooth anim rewind.
 	UPROPERTY(EditDefaultsOnly, Category = "Chronogy", meta = (EditCondition = "bSnapshotBonePoses", ClampMin = "1"))
 	int32 BoneSnapshotFrameInterval = 3;
+
+	// If the owner has a ULightComponent, snapshot and rewind its Intensity and Color.
+	UPROPERTY(EditDefaultsOnly, Category = "Chronogy")
+	bool bSnapshotLightProperties = false;
+
+	// If the owner has a mesh, create a UMaterialInstanceDynamic for slot 0 and rewind all detected scalar and vector parameters.
+	UPROPERTY(EditDefaultsOnly, Category = "Chronogy")
+	bool bSnapshotMaterialParameters = false;
 
 	// Read-only query used by anim graphs and interface implementors to know when rewind is active.
 	UFUNCTION(BlueprintPure, Category = "Chronogy")
@@ -92,6 +129,8 @@ private:
 	void ApplySnapshotAtTime(float Timestamp);
 	void EraseFutureSnapshots(float FromTimestamp);
 	void PlayBonePoseSnapshots();
+	void ApplyLightAtTime(float Timestamp);
+	void ApplyMaterialAtTime(float Timestamp);
 	UAnimInstance* GetAnimInstance() const;
 
 	UFUNCTION()
@@ -102,7 +141,12 @@ private:
 
 	TArray<FChronogySnapshot>     SnapshotBuffer;
 	TArray<FChronogyPoseSnapshot> BonePoseBuffer;
+	TArray<FChronogyLightFrame>   LightBuffer;
+	TArray<FChronogyMaterialFrame> MaterialBuffer;
 	IChronogySnapshotInterface*   SnapshotInterface = nullptr;
+
+	TArray<FName> DetectedScalarParams;
+	TArray<FName> DetectedVectorParams;
 
 	bool  bIsRewinding                = false;
 	bool  bPausedPhysics              = false;
@@ -117,5 +161,8 @@ private:
 	UPrimitiveComponent*         OwnerRootComponent     = nullptr;
 	UCharacterMovementComponent* OwnerMovementComponent = nullptr;
 	USkeletalMeshComponent*      OwnerSkeletalMesh      = nullptr;
+	ULightComponent*             OwnerLightComponent    = nullptr;
+	UMeshComponent*              OwnerMeshComponent     = nullptr;
+	UMaterialInstanceDynamic*    OwnerDynMat            = nullptr;
 	UChronogySubsystem*          Subsystem              = nullptr;
 };

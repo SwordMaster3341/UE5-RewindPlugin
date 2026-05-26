@@ -5,7 +5,10 @@
 #include "ChronogyLogs.h"
 #include "Interfaces/ChronogyAnimInterface.h"
 #include "Interfaces/ChronogySnapshotInterface.h"
+#include "Components/LightComponent.h"
+#include "Components/MeshComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/PoseSnapshot.h"
 #include "GameFramework/Character.h"
@@ -31,6 +34,10 @@ void UChronogyComponent::BeginPlay()
 	SnapshotInterface = Cast<IChronogySnapshotInterface>(GetOwner());
 
 	OwnerRootComponent = Cast<UPrimitiveComponent>(GetOwner()->GetRootComponent());
+	if (!OwnerRootComponent)
+	{
+		UE_LOG(LogChronogy, Warning, TEXT("[%s] Root component is not a UPrimitiveComponent — physics will not be paused during rewind. Make the Static Mesh the root component in the Blueprint Components panel."), *GetOwner()->GetName());
+	}
 
 	if (bSnapshotMovementVelocityAndMode)
 	{
@@ -50,6 +57,61 @@ void UChronogyComponent::BeginPlay()
 		MaxBonePoseCount  = FMath::CeilToInt(MaxRewindSeconds /
 			(SnapShotFrequencySeconds * FMath::Max(1, BoneSnapshotFrameInterval)));
 		BonePoseBuffer.Reserve(MaxBonePoseCount);
+	}
+
+	if (bSnapshotLightProperties)
+	{
+		OwnerLightComponent = GetOwner()->FindComponentByClass<ULightComponent>();
+		if (OwnerLightComponent)
+		{
+			LightBuffer.Reserve(MaxSnapshotCount);
+			UE_LOG(LogChronogy, Log, TEXT("[%s] Light property snapshotting enabled."), *GetOwner()->GetName());
+		}
+		else
+		{
+			UE_LOG(LogChronogy, Warning, TEXT("[%s] bSnapshotLightProperties=true but no ULightComponent found — light will not be rewound."), *GetOwner()->GetName());
+		}
+	}
+
+	if (bSnapshotMaterialParameters)
+	{
+		if (UMeshComponent* Mesh = GetOwner()->FindComponentByClass<UMeshComponent>())
+		{
+			OwnerMeshComponent = Mesh;
+			OwnerDynMat = Cast<UMaterialInstanceDynamic>(Mesh->GetMaterial(0));
+			if (!OwnerDynMat)
+			{
+				OwnerDynMat = Mesh->CreateAndSetMaterialInstanceDynamic(0);
+			}
+
+			if (OwnerDynMat)
+			{
+				TArray<FMaterialParameterInfo> ParamInfos;
+				TArray<FGuid> ParamGuids;
+				OwnerDynMat->GetAllScalarParameterInfo(ParamInfos, ParamGuids);
+				for (const FMaterialParameterInfo& Info : ParamInfos)
+				{
+					DetectedScalarParams.Add(Info.Name);
+				}
+				ParamInfos.Reset(); ParamGuids.Reset();
+				OwnerDynMat->GetAllVectorParameterInfo(ParamInfos, ParamGuids);
+				for (const FMaterialParameterInfo& Info : ParamInfos)
+				{
+					DetectedVectorParams.Add(Info.Name);
+				}
+				MaterialBuffer.Reserve(MaxSnapshotCount);
+				UE_LOG(LogChronogy, Log, TEXT("[%s] Material parameter snapshotting enabled. Scalar params: %d, Vector params: %d"),
+					*GetOwner()->GetName(), DetectedScalarParams.Num(), DetectedVectorParams.Num());
+			}
+			else
+			{
+				UE_LOG(LogChronogy, Warning, TEXT("[%s] bSnapshotMaterialParameters=true but could not create UMaterialInstanceDynamic for slot 0."), *GetOwner()->GetName());
+			}
+		}
+		else
+		{
+			UE_LOG(LogChronogy, Warning, TEXT("[%s] bSnapshotMaterialParameters=true but no UMeshComponent found."), *GetOwner()->GetName());
+		}
 	}
 
 	Subsystem = GetWorld()->GetGameInstance()->GetSubsystem<UChronogySubsystem>();
@@ -94,6 +156,7 @@ void UChronogyComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAc
 		RewindPlaybackTime -= RealDelta * RewindSpeed;
 		ApplySnapshotAtTime(RewindPlaybackTime);
 		PlayBonePoseSnapshots();
+		if (Subsystem) Subsystem->OnRewindTick(RewindPlaybackTime);
 	}
 	else
 	{
@@ -246,6 +309,31 @@ void UChronogyComponent::RecordSnapshot()
 
 	SnapshotBuffer.Add(Snap);
 
+	if (bSnapshotLightProperties && OwnerLightComponent)
+	{
+		if (LightBuffer.Num() >= MaxSnapshotCount)
+			LightBuffer.RemoveAt(0, 1, EAllowShrinking::No);
+		FChronogyLightFrame& LF = LightBuffer.AddDefaulted_GetRef();
+		LF.Timestamp  = Snap.Timestamp;
+		LF.Intensity  = OwnerLightComponent->Intensity;
+		LF.LightColor = FLinearColor::FromSRGBColor(OwnerLightComponent->LightColor);
+	}
+
+	if (bSnapshotMaterialParameters && OwnerDynMat)
+	{
+		if (MaterialBuffer.Num() >= MaxSnapshotCount)
+			MaterialBuffer.RemoveAt(0, 1, EAllowShrinking::No);
+		FChronogyMaterialFrame& MF = MaterialBuffer.AddDefaulted_GetRef();
+		MF.Timestamp = Snap.Timestamp;
+		MF.Material  = OwnerMeshComponent->GetMaterial(0);
+		MF.ScalarValues.SetNumUninitialized(DetectedScalarParams.Num());
+		for (int32 i = 0; i < DetectedScalarParams.Num(); i++)
+			OwnerDynMat->GetScalarParameterValue(FMaterialParameterInfo(DetectedScalarParams[i]), MF.ScalarValues[i]);
+		MF.VectorValues.SetNumUninitialized(DetectedVectorParams.Num());
+		for (int32 i = 0; i < DetectedVectorParams.Num(); i++)
+			OwnerDynMat->GetVectorParameterValue(FMaterialParameterInfo(DetectedVectorParams[i]), MF.VectorValues[i]);
+	}
+
 	if (bSnapshotBonePoses && OwnerSkeletalMesh)
 	{
 		FramesSinceLastBoneSnapshot++;
@@ -323,9 +411,91 @@ void UChronogyComponent::ApplySnapshotAtTime(float Timestamp)
 		OwnerMovementComponent->SetMovementMode(Mode);
 	}
 
+	ApplyLightAtTime(Timestamp);
+	ApplyMaterialAtTime(Timestamp);
+
 	if (SnapshotInterface)
 	{
 		SnapshotInterface->ApplySnapshot(Timestamp);
+	}
+}
+
+void UChronogyComponent::ApplyLightAtTime(float Timestamp)
+{
+	if (!bSnapshotLightProperties || !OwnerLightComponent || LightBuffer.Num() == 0) { return; }
+
+	if (Timestamp <= LightBuffer[0].Timestamp)
+	{
+		OwnerLightComponent->SetIntensity(LightBuffer[0].Intensity);
+		OwnerLightComponent->SetLightColor(LightBuffer[0].LightColor);
+		return;
+	}
+	if (Timestamp >= LightBuffer.Last().Timestamp) { return; }
+
+	int32 Lo = 0, Hi = LightBuffer.Num() - 1;
+	while (Lo + 1 < Hi)
+	{
+		const int32 Mid = (Lo + Hi) / 2;
+		if (LightBuffer[Mid].Timestamp <= Timestamp) Lo = Mid;
+		else Hi = Mid;
+	}
+
+	const FChronogyLightFrame& Older = LightBuffer[Lo];
+	const FChronogyLightFrame& Newer = LightBuffer[Hi];
+	const float Alpha = FMath::Clamp((Timestamp - Older.Timestamp) / (Newer.Timestamp - Older.Timestamp), 0.f, 1.f);
+
+	OwnerLightComponent->SetIntensity(FMath::Lerp(Older.Intensity, Newer.Intensity, Alpha));
+	OwnerLightComponent->SetLightColor(FMath::Lerp(Older.LightColor, Newer.LightColor, Alpha));
+}
+
+void UChronogyComponent::ApplyMaterialAtTime(float Timestamp)
+{
+	if (!bSnapshotMaterialParameters || !OwnerDynMat || MaterialBuffer.Num() == 0) { return; }
+
+	auto RestoreMaterial = [&](const FChronogyMaterialFrame& Frame)
+	{
+		if (Frame.Material.IsValid() && OwnerMeshComponent->GetMaterial(0) != Frame.Material.Get())
+		{
+			OwnerMeshComponent->SetMaterial(0, Frame.Material.Get());
+		}
+	};
+
+	auto ApplyParams = [&](const FChronogyMaterialFrame& Frame)
+	{
+		if (!OwnerDynMat) { return; }
+		for (int32 i = 0; i < DetectedScalarParams.Num(); i++)
+			if (Frame.ScalarValues.IsValidIndex(i))
+				OwnerDynMat->SetScalarParameterValue(DetectedScalarParams[i], Frame.ScalarValues[i]);
+		for (int32 i = 0; i < DetectedVectorParams.Num(); i++)
+			if (Frame.VectorValues.IsValidIndex(i))
+				OwnerDynMat->SetVectorParameterValue(DetectedVectorParams[i], Frame.VectorValues[i]);
+	};
+
+	if (Timestamp <= MaterialBuffer[0].Timestamp) { RestoreMaterial(MaterialBuffer[0]); ApplyParams(MaterialBuffer[0]); return; }
+	if (Timestamp >= MaterialBuffer.Last().Timestamp) { return; }
+
+	int32 Lo = 0, Hi = MaterialBuffer.Num() - 1;
+	while (Lo + 1 < Hi)
+	{
+		const int32 Mid = (Lo + Hi) / 2;
+		if (MaterialBuffer[Mid].Timestamp <= Timestamp) Lo = Mid;
+		else Hi = Mid;
+	}
+
+	const FChronogyMaterialFrame& Older = MaterialBuffer[Lo];
+	const FChronogyMaterialFrame& Newer = MaterialBuffer[Hi];
+	const float Alpha = FMath::Clamp((Timestamp - Older.Timestamp) / (Newer.Timestamp - Older.Timestamp), 0.f, 1.f);
+
+	RestoreMaterial(Older);
+
+	if (OwnerDynMat)
+	{
+		for (int32 i = 0; i < DetectedScalarParams.Num(); i++)
+			if (Older.ScalarValues.IsValidIndex(i) && Newer.ScalarValues.IsValidIndex(i))
+				OwnerDynMat->SetScalarParameterValue(DetectedScalarParams[i], FMath::Lerp(Older.ScalarValues[i], Newer.ScalarValues[i], Alpha));
+		for (int32 i = 0; i < DetectedVectorParams.Num(); i++)
+			if (Older.VectorValues.IsValidIndex(i) && Newer.VectorValues.IsValidIndex(i))
+				OwnerDynMat->SetVectorParameterValue(DetectedVectorParams[i], FMath::Lerp(Older.VectorValues[i], Newer.VectorValues[i], Alpha));
 	}
 }
 
@@ -348,6 +518,22 @@ void UChronogyComponent::EraseFutureSnapshots(float FromTimestamp)
 	{
 		if (BonePoseBuffer[i].Timestamp > FromTimestamp)
 			BonePoseBuffer.RemoveAt(i, 1, EAllowShrinking::No);
+		else
+			break;
+	}
+
+	for (int32 i = LightBuffer.Num() - 1; i >= 0; --i)
+	{
+		if (LightBuffer[i].Timestamp > FromTimestamp)
+			LightBuffer.RemoveAt(i, 1, EAllowShrinking::No);
+		else
+			break;
+	}
+
+	for (int32 i = MaterialBuffer.Num() - 1; i >= 0; --i)
+	{
+		if (MaterialBuffer[i].Timestamp > FromTimestamp)
+			MaterialBuffer.RemoveAt(i, 1, EAllowShrinking::No);
 		else
 			break;
 	}
