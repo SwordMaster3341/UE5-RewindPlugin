@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// S-G-D
 
 #pragma once
 
@@ -40,7 +40,7 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Chronogy")
 	float GlobalRewindSpeed = 1.0f;
 
-	UPROPERTY(EditDefaultsOnly, Category = "Chronogy")
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Chronogy")
 	float CurrentTimeDilation = 1.0f;
 
 	UFUNCTION(BlueprintCallable, Category = "Chronogy")

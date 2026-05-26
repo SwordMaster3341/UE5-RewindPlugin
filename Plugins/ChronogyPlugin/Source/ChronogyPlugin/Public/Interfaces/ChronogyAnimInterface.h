@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// S-G-D
 
 #pragma once
 
@@ -7,8 +7,7 @@
 #include "Animation/PoseSnapshot.h"
 #include "ChronogyAnimInterface.generated.h"
 
-//ChronogyAniminterface is simply the UObject shell required for any UInterface
-// No Bluprints, created as CPP only
+// UChronogyAnimInterface is the UObject shell required by UInterface — not Blueprintable, C++ only.
 UINTERFACE(MinimalAPI)
 class UChronogyAnimInterface : public UInterface
 {

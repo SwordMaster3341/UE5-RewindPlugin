@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// S-G-D
 
 #pragma once
 
@@ -6,7 +6,7 @@
 #include "GameFramework/Actor.h"
 #include "ChronogySMActor.generated.h"
 
-//Forward Declerations
+// Forward Declarations
 class UStaticMeshComponent;
 class UChronogyComponent;
 
