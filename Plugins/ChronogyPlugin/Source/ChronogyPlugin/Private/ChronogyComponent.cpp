@@ -195,7 +195,10 @@ UAnimInstance* UChronogyComponent::GetAnimInstance() const
 
 	if (!Mesh)
 	{
-		UE_LOG(LogChronogy, Warning, TEXT("[%s] GetAnimInstance: no SkeletalMeshComponent found."), *GetOwner()->GetName());
+		if (bSnapshotBonePoses)
+		{
+			UE_LOG(LogChronogy, Warning, TEXT("[%s] GetAnimInstance: no SkeletalMeshComponent found."), *GetOwner()->GetName());
+		}
 		return nullptr;
 	}
 
