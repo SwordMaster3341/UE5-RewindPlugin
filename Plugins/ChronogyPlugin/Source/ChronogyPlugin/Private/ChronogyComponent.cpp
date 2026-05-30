@@ -9,6 +9,7 @@
 #include "Components/MeshComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "NiagaraComponent.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/PoseSnapshot.h"
 #include "GameFramework/Character.h"
@@ -114,6 +115,11 @@ void UChronogyComponent::BeginPlay()
 		}
 	}
 
+	if (bSnapshotParticles)
+	{
+		DiscoverParticleComponents();
+	}
+
 	Subsystem = GetWorld()->GetGameInstance()->GetSubsystem<UChronogySubsystem>();
 	if (Subsystem)
 	{
@@ -156,10 +162,25 @@ void UChronogyComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAc
 		RewindPlaybackTime -= RealDelta * RewindSpeed;
 		ApplySnapshotAtTime(RewindPlaybackTime);
 		PlayBonePoseSnapshots();
-		if (Subsystem) Subsystem->OnRewindTick(RewindPlaybackTime);
+
+		// Clamp the particle clock to the oldest recorded moment. RewindPlaybackTime is unbounded
+		// (the rewind ability has no floor), but the buffer only goes back to SnapshotBuffer[0];
+		// ApplySnapshotAtTime already clamps transforms to that bottom. Without the same clamp here,
+		// the falling clock sweeps a finished burst's age back into [0, DeathAge] and it "respawns"
+		// when the buffer is exhausted. Clamping freezes particles with the world at the buffer floor.
+		const float ParticleClock = SnapshotBuffer.Num() > 0
+			? FMath::Max(RewindPlaybackTime, SnapshotBuffer[0].Timestamp)
+			: RewindPlaybackTime;
+		if (bSnapshotParticles) ApplyParticlesAtTime(ParticleClock);
+		if (Subsystem) Subsystem->OnRewindTick(ParticleClock);
 	}
 	else
 	{
+		// Drive particle age every frame (finer than the snapshot interval) so brief bursts play
+		// and later reverse smoothly. Owner-attached systems here; detached FX via the subsystem.
+		if (bSnapshotParticles) PollParticleActivations(RealNow);
+		if (Subsystem) Subsystem->OnForwardTick(RealNow);
+
 		// Use real delta so snapshot intervals are consistent during time dilation
 		TimeSinceLastSnapshot += RealDelta;
 		if (TimeSinceLastSnapshot >= SnapShotFrequencySeconds)
@@ -211,6 +232,11 @@ void UChronogyComponent::OnRewindStarted()
 	{
 		IChronogyAnimInterface::Execute_SetIsRewinding(AnimInst, true);
 	}
+
+	if (bSnapshotParticles)
+	{
+		BeginParticleRewind();
+	}
 }
 
 void UChronogyComponent::OnRewindCompleted()
@@ -242,7 +268,18 @@ void UChronogyComponent::OnRewindCompleted()
 	UE_LOG(LogChronogy, Log, TEXT("[%s] Rewind completed at T=%.3f. Snapshots remaining: %d"),
 		*GetOwner()->GetName(), RewindPlaybackTime, SnapshotBuffer.Num());
 
+	// Match the in-rewind particle clock clamp (see TickComponent). Compute the floored stop clock
+	// BEFORE EraseFutureSnapshots, which can empty the buffer and lose SnapshotBuffer[0].
+	const float ParticleStopClock = (bSnapshotParticles && SnapshotBuffer.Num() > 0)
+		? FMath::Max(RewindPlaybackTime, SnapshotBuffer[0].Timestamp)
+		: RewindPlaybackTime;
+
 	EraseFutureSnapshots(RewindPlaybackTime);
+
+	if (bSnapshotParticles)
+	{
+		EndParticleRewind(ParticleStopClock);
+	}
 
 	if (UAnimInstance* AnimInst = GetAnimInstance())
 	{
@@ -600,4 +637,70 @@ void UChronogyComponent::PlayBonePoseSnapshots()
 	}
 
 	IChronogyAnimInterface::Execute_PushRewindPoseSnapshot(AnimInst, BlendedPose);
+}
+
+void UChronogyComponent::DiscoverParticleComponents()
+{
+	TArray<UNiagaraComponent*> Comps;
+	GetOwner()->GetComponents<UNiagaraComponent>(Comps);
+
+	const float Now = GetWorld()->GetRealTimeSeconds();
+	for (UNiagaraComponent* C : Comps)
+	{
+		if (!C) { continue; }
+
+		FChronogyParticleTrack& Track = ParticleTracks.AddDefaulted_GetRef();
+		Track.Component  = C;
+		Track.Mode       = DefaultParticleRewindMode;
+		Track.bWasActive = C->IsActive();
+		Track.BirthTime  = Track.bWasActive ? Now : -1.f;
+		Track.DeathAge   = -1.f;
+
+		// Put Scrub systems into solo + DesiredAge now and keep them there for their whole life.
+		// Their age is driven from the rewind clock every frame — up in forward play, down in
+		// rewind — so the mode never switches and they never vanish/freeze on rewind release.
+		UChronogySubsystem::ConfigureTrackForRewind(Track, ParticleSeekDelta);
+	}
+
+	if (ParticleTracks.Num() == 0)
+	{
+		UE_LOG(LogChronogy, Warning, TEXT("[%s] bSnapshotParticles=true but no UNiagaraComponent found — particles will not be rewound."), *GetOwner()->GetName());
+	}
+	else
+	{
+		UE_LOG(LogChronogy, Log, TEXT("[%s] Particle rewind enabled. Tracking %d Niagara system(s)."), *GetOwner()->GetName(), ParticleTracks.Num());
+	}
+}
+
+void UChronogyComponent::PollParticleActivations(float Now)
+{
+	for (FChronogyParticleTrack& Track : ParticleTracks)
+	{
+		UChronogySubsystem::PollTrackActivation(Track, Now);
+	}
+}
+
+void UChronogyComponent::ApplyParticlesAtTime(float RewindClock)
+{
+	for (FChronogyParticleTrack& Track : ParticleTracks)
+	{
+		UChronogySubsystem::ApplyTrackAgeAtTime(Track, RewindClock);
+	}
+}
+
+void UChronogyComponent::BeginParticleRewind()
+{
+	// Nothing to switch: Scrub systems are already solo + DesiredAge and stay that way, and Freeze
+	// is paused per-frame by ApplyTrackAgeAtTime. Kept as a hook on the rewind-start event.
+}
+
+void UChronogyComponent::EndParticleRewind(float FromTimestamp)
+{
+	// Re-anchor each system's birth to real time at the stopped rewind clock so forward play
+	// continues from exactly the age the rewind landed on (RestoreTrack also unpauses Freeze).
+	const float Now = GetWorld()->GetRealTimeSeconds();
+	for (FChronogyParticleTrack& Track : ParticleTracks)
+	{
+		UChronogySubsystem::RestoreTrack(Track, FromTimestamp, Now);
+	}
 }

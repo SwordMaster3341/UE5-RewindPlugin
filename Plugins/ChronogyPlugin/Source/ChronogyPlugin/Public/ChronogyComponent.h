@@ -6,6 +6,7 @@
 #include "Components/ActorComponent.h"
 #include "Engine/EngineTypes.h"
 #include "Animation/PoseSnapshot.h"
+#include "ChronogyParticle.h"
 #include "ChronogyComponent.generated.h"
 
 /**
@@ -25,6 +26,7 @@ class ULightComponent;
 class UMeshComponent;
 class UMaterialInterface;
 class UMaterialInstanceDynamic;
+class UNiagaraComponent;
 class IChronogySnapshotInterface;
 
 USTRUCT()
@@ -120,6 +122,18 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "Chronogy")
 	bool bSnapshotMaterialParameters = false;
 
+	// If the owner has UNiagaraComponents, record their activation times and reverse them during rewind.
+	UPROPERTY(EditDefaultsOnly, Category = "Chronogy")
+	bool bSnapshotParticles = false;
+
+	// Default reversal mechanism for detected Niagara systems. Scrub = true reverse (short CPU bursts); FollowTransform = motion-trails that follow the rewinding owner; Freeze = pause+gate fallback (GPU/looping/long/non-deterministic).
+	UPROPERTY(EditDefaultsOnly, Category = "Chronogy", meta = (EditCondition = "bSnapshotParticles"))
+	EChronogyParticleRewindMode DefaultParticleRewindMode = EChronogyParticleRewindMode::Scrub;
+
+	// Seek granularity (seconds) while scrubbing Niagara age backward. Larger = cheaper, less smooth.
+	UPROPERTY(EditDefaultsOnly, Category = "Chronogy", meta = (EditCondition = "bSnapshotParticles", ClampMin = "0.005"))
+	float ParticleSeekDelta = 0.0166f;
+
 	// Read-only query used by anim graphs and interface implementors to know when rewind is active.
 	UFUNCTION(BlueprintPure, Category = "Chronogy")
 	bool IsRewinding() const { return bIsRewinding; }
@@ -131,6 +145,11 @@ private:
 	void PlayBonePoseSnapshots();
 	void ApplyLightAtTime(float Timestamp);
 	void ApplyMaterialAtTime(float Timestamp);
+	void DiscoverParticleComponents();
+	void PollParticleActivations(float DeltaSeconds);
+	void ApplyParticlesAtTime(float DeltaSeconds);
+	void BeginParticleRewind();
+	void EndParticleRewind(float FromTimestamp);
 	UAnimInstance* GetAnimInstance() const;
 
 	UFUNCTION()
@@ -143,6 +162,10 @@ private:
 	TArray<FChronogyPoseSnapshot> BonePoseBuffer;
 	TArray<FChronogyLightFrame>   LightBuffer;
 	TArray<FChronogyMaterialFrame> MaterialBuffer;
+
+	UPROPERTY()
+	TArray<FChronogyParticleTrack> ParticleTracks;
+
 	IChronogySnapshotInterface*   SnapshotInterface = nullptr;
 
 	TArray<FName> DetectedScalarParams;

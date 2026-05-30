@@ -15,7 +15,8 @@ public class ChronogyPlugin : ModuleRules
 			"Engine",
 			"GameplayAbilities",
 			"GameplayTasks",
-			"GameplayTags"
+			"GameplayTags",
+			"Niagara"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });
