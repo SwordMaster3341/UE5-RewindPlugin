@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "Containers/RingBuffer.h"
 #include "Interfaces/ChronogySnapshotInterface.h"
 #include "ChronogyToggleable.generated.h"
 
@@ -59,5 +60,5 @@ protected:
 
 private:
 	bool bIsOn = false;
-	TArray<FChronogyToggleableFrame> FrameBuffer;
+	TRingBuffer<FChronogyToggleableFrame> FrameBuffer;
 };

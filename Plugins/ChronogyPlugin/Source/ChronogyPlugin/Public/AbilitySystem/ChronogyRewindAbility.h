@@ -7,7 +7,7 @@
 #include "ChronogyRewindAbility.generated.h"
 
 /**
- * 
+ * Gas Ability that can trigger rewind
  */
 UCLASS()
 class CHRONOGYPLUGIN_API UChronogyRewindAbility : public UChronogyAbilityBase

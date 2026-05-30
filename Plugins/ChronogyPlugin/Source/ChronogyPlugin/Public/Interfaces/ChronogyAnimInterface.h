@@ -7,7 +7,7 @@
 #include "Animation/PoseSnapshot.h"
 #include "ChronogyAnimInterface.generated.h"
 
-// UChronogyAnimInterface is the UObject shell required by UInterface — not Blueprintable, C++ only.
+// UChronogyAnimInterface is the UObject shell required by UInterface. 
 UINTERFACE(MinimalAPI)
 class UChronogyAnimInterface : public UInterface
 {
@@ -15,6 +15,16 @@ class UChronogyAnimInterface : public UInterface
 };
 
 /**
+ * The purpose of the AnimInterface is to allow any Actor's animation blueprint to be rewindable no matter the state.
+ * 
+ * The setup is as follows:
+ * 
+ * Implement the ChronogyInterface
+ * Override the two BlueprintNativeEvent functions to store the incoming pose snapshot and bool in the anim instance each tick.
+ * Blend Pose By Bool (bIsRewinding) node in the anim graph, with the normal pose on one side and a Pose Snapshot on the other.
+ * 
+ * It is done this way so that no matter what skeleton or animation blueprint setup you have,
+ * you can still have a rewind pose by just implementing this interface and blending to the snapshot pose when bIsRewinding is true.
  * 
  */
 class CHRONOGYPLUGIN_API IChronogyAnimInterface

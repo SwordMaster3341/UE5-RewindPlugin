@@ -6,6 +6,8 @@
 #include "AbilitySystem/ChronogyAbilityBase.h"
 #include "ChronogyTimeStopAbility.generated.h"
 
+//Simple time stop ability, stops everything including the player.
+
 UCLASS()
 class CHRONOGYPLUGIN_API UChronogyTimeStopAbility : public UChronogyAbilityBase
 {

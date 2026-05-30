@@ -35,6 +35,8 @@ void AChronogyDestructable::BeginPlay()
 {
 	Super::BeginPlay();
 
+	TransformBuffer.Reserve(MaxFrames);
+
 	CreateFragmentComponents();
 
 	// Remember whether the intact cube is a physics body so we can re-enable it after reassembly.
@@ -184,12 +186,12 @@ void AChronogyDestructable::CaptureSnapshot()
 		return;
 	}
 
-	if (TransformBuffer.Num() >= MaxFrames)
+	if (static_cast<int32>(TransformBuffer.Num()) >= MaxFrames)
 	{
-		TransformBuffer.RemoveAt(0, 1, EAllowShrinking::No);
+		TransformBuffer.PopFront();
 	}
 
-	FChronogyDestructableTransformFrame& Frame = TransformBuffer.AddDefaulted_GetRef();
+	FChronogyDestructableTransformFrame& Frame = TransformBuffer.Emplace_GetRef();
 	Frame.Timestamp = Now;
 	Frame.FragmentTransforms.SetNumUninitialized(FragmentComponents.Num());
 	const FTransform ActorTM = GetActorTransform();
@@ -266,7 +268,7 @@ void AChronogyDestructable::ApplyFracturedTransforms(float Timestamp)
 
 	// Binary search for the two frames bracketing Timestamp (same pattern as UChronogyComponent).
 	int32 Lo = 0;
-	int32 Hi = TransformBuffer.Num() - 1;
+	int32 Hi = static_cast<int32>(TransformBuffer.Num()) - 1;
 	while (Lo + 1 < Hi)
 	{
 		const int32 Mid = (Lo + Hi) / 2;
@@ -278,8 +280,13 @@ void AChronogyDestructable::ApplyFracturedTransforms(float Timestamp)
 
 	const FChronogyDestructableTransformFrame& Older = TransformBuffer[Lo];
 	const FChronogyDestructableTransformFrame& Newer = TransformBuffer[Hi];
+	// Guard a degenerate bracket (two frames the same instant — e.g. an interval capture landing on
+	// the same frame as the on-fracture CaptureSnapshot): a 0 range would divide to NaN and corrupt
+	// every fragment transform. Fall back to the newer frame.
 	const float Range = Newer.Timestamp - Older.Timestamp;
-	const float Alpha = FMath::Clamp((Timestamp - Older.Timestamp) / Range, 0.f, 1.f);
+	const float Alpha = Range > KINDA_SMALL_NUMBER
+		? FMath::Clamp((Timestamp - Older.Timestamp) / Range, 0.f, 1.f)
+		: 1.f;
 
 	for (int32 i = 0; i < FragmentComponents.Num(); ++i)
 	{
@@ -299,13 +306,8 @@ void AChronogyDestructable::ApplyFracturedTransforms(float Timestamp)
 
 void AChronogyDestructable::EraseFutureSnapshots(float FromTimestamp)
 {
-	for (int32 i = TransformBuffer.Num() - 1; i >= 0; --i)
-	{
-		if (TransformBuffer[i].Timestamp > FromTimestamp)
-			TransformBuffer.RemoveAt(i, 1, EAllowShrinking::No);
-		else
-			break;
-	}
+	while (TransformBuffer.Num() > 0 && TransformBuffer.Last().Timestamp > FromTimestamp)
+		TransformBuffer.Pop();
 
 	for (int32 i = StateBuffer.Num() - 1; i >= 0; --i)
 	{
@@ -420,7 +422,7 @@ void AChronogyDestructable::RestoreFragmentVelocities()
 	}
 
 	const FChronogyDestructableTransformFrame& Newer = TransformBuffer.Last();
-	const FChronogyDestructableTransformFrame& Older = TransformBuffer[TransformBuffer.Num() - 2];
+	const FChronogyDestructableTransformFrame& Older = TransformBuffer[static_cast<int32>(TransformBuffer.Num()) - 2];
 	const float Dt = Newer.Timestamp - Older.Timestamp;
 	if (Dt <= KINDA_SMALL_NUMBER)
 	{

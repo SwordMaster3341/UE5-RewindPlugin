@@ -7,6 +7,10 @@
 #include "ChronogySnapshotInterface.generated.h"
 
 
+/*
+Serves as an escape hatch incase there is some custom functionality I want to implement later without adding to the component
+*/
+
 UINTERFACE(MinimalAPI, NotBlueprintable)
 class UChronogySnapshotInterface : public UInterface
 {

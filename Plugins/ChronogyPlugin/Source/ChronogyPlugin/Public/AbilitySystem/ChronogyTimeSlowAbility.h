@@ -6,6 +6,9 @@
 #include "AbilitySystem/ChronogyAbilityBase.h"
 #include "ChronogyTimeSlowAbility.generated.h"
 
+// Simple Time slow ability, which sets global time dilation to a specified value and adjusts the player's custom time dilation to compensate
+// creating a slow motion effect for everything except the player. Time dilation is reset when the ability ends.
+
 UCLASS()
 class CHRONOGYPLUGIN_API UChronogyTimeSlowAbility : public UChronogyAbilityBase
 {

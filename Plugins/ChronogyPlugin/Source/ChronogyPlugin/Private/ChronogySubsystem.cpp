@@ -62,9 +62,6 @@ void UChronogySubsystem::StartGlobalRewind()
     CurrentRewindTimestamp = GetGameInstance()->GetWorld()->GetRealTimeSeconds();
     UE_LOG(LogChronogy, Log, TEXT("ChronogySubsystem: global rewind started (speed=%.2f, components=%d, tracked actors=%d)"), GlobalRewindSpeed, RegisteredComponents.Num(), SpawnedActorRecords.Num());
 
-    // Detached FX need no mode change here: each was put into solo + DesiredAge when it was
-    // registered and stays there. OnRewindTick simply starts driving its age downward.
-
     OnRewindStarted.Broadcast();
 }
 
@@ -95,9 +92,6 @@ void UChronogySubsystem::StopGlobalRewind()
         }
     }
 
-    // Detached FX: destroy any that were rewound back to before they were spawned; let the rest
-    // resume forward play. RestoreTrack re-anchors their birth time to Now so they continue from
-    // the age the rewind stopped on; OnForwardTick then drives them forward again.
     const float Now = GetGameInstance()->GetWorld()->GetRealTimeSeconds();
     for (int32 i = FXTracks.Num() - 1; i >= 0; --i)
     {
@@ -111,7 +105,7 @@ void UChronogySubsystem::StopGlobalRewind()
 
         if (Track.BirthTime < 0.f || CurrentRewindTimestamp < Track.BirthTime)
         {
-            // Rewound to before it was spawned — it no longer exists.
+            // Rewound to before it was spawned it no longer exists.
             C->DestroyComponent();
             FXTracks.RemoveAt(i, 1, EAllowShrinking::No);
             continue;
@@ -210,9 +204,6 @@ void UChronogySubsystem::ConfigureTrackForRewind(FChronogyParticleTrack& Track, 
     UNiagaraComponent* C = Track.Component.Get();
     if (!C) return;
 
-    // Only Scrub is age-driven. Freeze plays normally and is just paused during rewind;
-    // FollowTransform trails the rewinding owner. Configure Scrub ONCE and never switch back —
-    // the system lives its whole life in solo + DesiredAge so entering/leaving rewind is a no-op.
     if (Track.Mode != EChronogyParticleRewindMode::Scrub || Track.bScrubReady) return;
 
     C->SetForceSolo(true);
@@ -244,16 +235,10 @@ void UChronogySubsystem::PollTrackActivation(FChronogyParticleTrack& Track, floa
 
         if (!bActive && Track.bWasActive)
         {
-            // It was playing and went inactive => a one-shot finished. Record its lifetime so rewind
-            // hides it past this age and bounds the backward scrub to [0, DeathAge]. (A system merely
-            // scrubbed to its spawn point also reads inactive, but bWasActive is cleared there, so it
-            // is revived below instead of being killed.)
             Track.DeathAge = Age;
         }
         else if (Track.Mode == EChronogyParticleRewindMode::Scrub && Track.bScrubReady)
         {
-            // Keep it playing forward, reviving a system that idled inactive at its spawn point
-            // (e.g. right after a rewind landed on the birth frame) rather than leaving it frozen.
             if (!bActive) C->Activate(false);
             C->SetDesiredAge(Age);
         }
@@ -269,9 +254,6 @@ void UChronogySubsystem::ApplyTrackAgeAtTime(FChronogyParticleTrack& Track, floa
 
     const float Age = RewindClock - Track.BirthTime;
 
-    // Visible only within its real lifetime: at/after birth, and (if it finished) not past death.
-    // Outside that window it does not exist at this point on the timeline, so hide it. This is the
-    // only despawn gating the particle path does, and it bounds the backward scrub to [0, DeathAge].
     const bool bVisible = Age >= 0.f && (Track.DeathAge < 0.f || Age <= Track.DeathAge);
     if (!bVisible)
     {
@@ -301,24 +283,16 @@ void UChronogySubsystem::RestoreTrack(FChronogyParticleTrack& Track, float StopC
     UNiagaraComponent* C = Track.Component.Get();
     if (!C) return;
 
-    // Scrub stays in solo + DesiredAge for its whole life. Switching the age-update mode back here
-    // is exactly what de-registered the system from the batched sim and made it vanish, so we do
-    // NOT touch it — forward play resumes by driving DesiredAge upward again (PollTrackActivation).
     if (Track.Mode == EChronogyParticleRewindMode::Freeze)
     {
         C->SetPaused(false);
     }
-
-    // Re-anchor BirthTime to real time so forward play continues from exactly the age the rewind
-    // stopped on. Real time keeps advancing during the wait + rewind, so without this a one-shot
-    // stopped mid-life would resume showing itself already finished ((now - original birth) is huge).
+    //Stopped at its birth or greater
     if (Track.BirthTime >= 0.f)
     {
         const float AgeAtStop = StopClock - Track.BirthTime;
         if (AgeAtStop < 0.f)
         {
-            // Stopped before its birth — it does not exist in the resumed timeline. Reset to unborn
-            // so gameplay can spawn it fresh, and hide it now.
             Track.BirthTime  = -1.f;
             Track.DeathAge   = -1.f;
             if (C->IsActive()) C->Deactivate();
@@ -327,9 +301,6 @@ void UChronogySubsystem::RestoreTrack(FChronogyParticleTrack& Track, float StopC
         }
         if (Track.DeathAge < 0.f || AgeAtStop <= Track.DeathAge)
         {
-            // Stopped within its life — re-anchor so forward play continues from this exact age, and
-            // clear bWasActive so the next forward tick revives + drives it (rather than reading the
-            // just-scrubbed, possibly-inactive system as a death and freezing it at the spawn point).
             Track.BirthTime  = Now - AgeAtStop;
             Track.DeathAge   = -1.f;
             Track.bWasActive = false;

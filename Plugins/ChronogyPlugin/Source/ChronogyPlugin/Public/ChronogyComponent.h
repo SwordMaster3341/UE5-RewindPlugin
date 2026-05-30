@@ -6,6 +6,7 @@
 #include "Components/ActorComponent.h"
 #include "Engine/EngineTypes.h"
 #include "Animation/PoseSnapshot.h"
+#include "Containers/RingBuffer.h"
 #include "ChronogyParticle.h"
 #include "ChronogyComponent.generated.h"
 
@@ -22,6 +23,7 @@
 class UChronogySubsystem;
 class UPrimitiveComponent;
 class UCharacterMovementComponent;
+class USkeletalMeshComponent;
 class ULightComponent;
 class UMeshComponent;
 class UMaterialInterface;
@@ -148,7 +150,6 @@ private:
 	void DiscoverParticleComponents();
 	void PollParticleActivations(float DeltaSeconds);
 	void ApplyParticlesAtTime(float DeltaSeconds);
-	void BeginParticleRewind();
 	void EndParticleRewind(float FromTimestamp);
 	UAnimInstance* GetAnimInstance() const;
 
@@ -158,10 +159,11 @@ private:
 	UFUNCTION()
 	void OnRewindCompleted();
 
-	TArray<FChronogySnapshot>     SnapshotBuffer;
-	TArray<FChronogyPoseSnapshot> BonePoseBuffer;
-	TArray<FChronogyLightFrame>   LightBuffer;
-	TArray<FChronogyMaterialFrame> MaterialBuffer;
+	// TRingBuffers my love, memory management made easy (I did this with arrays first ima cry)
+	TRingBuffer<FChronogySnapshot>     SnapshotBuffer;
+	TRingBuffer<FChronogyPoseSnapshot> BonePoseBuffer;
+	TRingBuffer<FChronogyLightFrame>   LightBuffer;
+	TRingBuffer<FChronogyMaterialFrame> MaterialBuffer;
 
 	UPROPERTY()
 	TArray<FChronogyParticleTrack> ParticleTracks;
@@ -180,12 +182,20 @@ private:
 	int32 MaxBonePoseCount            = 0;
 	int32 FramesSinceLastBoneSnapshot = 0;
 
-	// Cached owner component references
-	UPrimitiveComponent*         OwnerRootComponent     = nullptr;
-	UCharacterMovementComponent* OwnerMovementComponent = nullptr;
-	USkeletalMeshComponent*      OwnerSkeletalMesh      = nullptr;
-	ULightComponent*             OwnerLightComponent    = nullptr;
-	UMeshComponent*              OwnerMeshComponent     = nullptr;
-	UMaterialInstanceDynamic*    OwnerDynMat            = nullptr;
-	UChronogySubsystem*          Subsystem              = nullptr;
+	// Cached owner component references that prevent dangling nullpointers during rewind when components may be destroyed and re-created.
+	// Still, why the heck are you destroying and re-creating components during rewind, don't do that, it's not gonna end well.
+	UPROPERTY()
+	TObjectPtr<UPrimitiveComponent>         OwnerRootComponent     = nullptr;
+	UPROPERTY()
+	TObjectPtr<UCharacterMovementComponent> OwnerMovementComponent = nullptr;
+	UPROPERTY()
+	TObjectPtr<USkeletalMeshComponent>      OwnerSkeletalMesh      = nullptr;
+	UPROPERTY()
+	TObjectPtr<ULightComponent>             OwnerLightComponent    = nullptr;
+	UPROPERTY()
+	TObjectPtr<UMeshComponent>              OwnerMeshComponent     = nullptr;
+	UPROPERTY()
+	TObjectPtr<UMaterialInstanceDynamic>    OwnerDynMat            = nullptr;
+	UPROPERTY()
+	TObjectPtr<UChronogySubsystem>          Subsystem              = nullptr;
 };

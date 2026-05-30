@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "Containers/RingBuffer.h"
 #include "Interfaces/ChronogySnapshotInterface.h"
 #include "ChronogyDestructable.generated.h"
 
@@ -124,8 +125,8 @@ private:
 	TArray<TObjectPtr<UStaticMeshComponent>> FragmentComponents;
 
 	TArray<FTransform>                   RestRelativeTransforms; // frame 0, fragment-local relative to root
-	TArray<FChronogyDestructableStateFrame>     StateBuffer;
-	TArray<FChronogyDestructableTransformFrame> TransformBuffer;
+	TArray<FChronogyDestructableStateFrame>     StateBuffer;      // step-function, appended on change only — not count-capped
+	TRingBuffer<FChronogyDestructableTransformFrame> TransformBuffer; // bulk per-fragment transforms, fixed window
 
 	UPROPERTY()
 	TObjectPtr<UChronogySubsystem> Subsystem;

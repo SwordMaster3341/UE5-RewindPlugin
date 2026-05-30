@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// S-G-D
 
 
 #include "AbilitySystem/ChronogyAbilityBase.h"
@@ -7,7 +7,6 @@
 bool UChronogyAbilityBase::CheckCost(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, OUT FGameplayTagContainer* OptionalRelevantTags) const
 {
     //Cost Validation
-
 
     if (!Super::CheckCost(Handle, ActorInfo, OptionalRelevantTags))
     {

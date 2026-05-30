@@ -12,7 +12,8 @@ public:
 extern CHRONOGYPLUGIN_API FLogCategoryLogChronogy LogChronogy;
 
 // Chronogy.DebugDraw  1 = draw snapshot paths and rewind playhead in-world each tick
-// Chronogy.Verbose    1 = log snapshot recording, playback, and buffer events each interval
 extern TAutoConsoleVariable<int32> CVarChronogyDebugDraw;
+// Chronogy.Verbose    1 = log snapshot recording, playback, and buffer events each interval
 extern TAutoConsoleVariable<int32> CVarChronogyVerbose;
+// Chronogy.DebugAnim  1 = log animation interface resolution and pose snapshot push events each rewind tick
 extern TAutoConsoleVariable<int32> CVarChronogyDebugAnim;
