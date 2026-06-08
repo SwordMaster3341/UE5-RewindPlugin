@@ -1,4 +1,4 @@
-// S-G-D
+// Blake de Armas
 
 //Chronogy Includes
 #include "ChronogyComponent.h"
@@ -252,7 +252,7 @@ void UChronogyComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAc
 	}
 	else
 	{
-		// This fixes a bug with rewinding that upon a player entering the game and then immidiately rewinding,
+		// This fixes a bug with rewinding that upon a player entering the game and then immediately rewinding,
 		// the particles do not despawn
 		if (bSnapshotParticles) PollParticleActivations(RealNow);
 		if (Subsystem) Subsystem->OnForwardTick(RealNow);

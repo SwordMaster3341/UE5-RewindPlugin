@@ -3,21 +3,14 @@
 A fully featured extendable time rewinding plugin for Unreal Engine 5 built on top of the Gameplay Ability System. 
 Is pretty memory efficient and supports rewinding any number of objects, animations, and custom properties with minimal setup.
 
->Originally inspired by [NU Makesgames' time rewind system](https://github.com/NuMakesGames/ue5-rewind) rebuilt from scratch as a decoupled production ready plugin.
+>Originally inspired by [NU Makes Games' time rewind system](https://github.com/NuMakesGames/ue5-rewind), rebuilt from scratch as a decoupled, production-ready plugin.
 
 ---
-
-### Note on this Repository:
-
-This is a public facing version of a larger project I actively develop on a self hosted instance of Gitea. 
-The commit history here will not reflect the full active development. 
-In general, I self host most of my work so my github profile underrepresents what I actually build.
-This repo mainly exists to give a readable overview for anyone who wants to see it.
 
 ## Features
 
 **GAS Integration:** 
-All rewind actions are implemented as GAS compatible Gameplay Abilities, giving you in-built support for cooldowns, activation conditions, and "easy" implementation for networking should your project require it.
+All rewind actions are implemented as GAS-compatible Gameplay Abilities, giving you built-in support for cooldowns and activation conditions. The plugin currently runs locally (single-player); building on GAS keeps it well positioned for replication, but networked rewind is not implemented yet.
 
 **Decoupled Architecture**
 No tight coupling to any actors or components, you can drop it into any project without modification.

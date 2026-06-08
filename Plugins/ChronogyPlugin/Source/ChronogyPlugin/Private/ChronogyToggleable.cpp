@@ -1,4 +1,4 @@
-// S-G-D
+// Blake de Armas
 
 #include "ChronogyToggleable.h"
 #include "ChronogyComponent.h"

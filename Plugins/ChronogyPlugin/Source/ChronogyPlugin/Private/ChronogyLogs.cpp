@@ -1,4 +1,4 @@
-// S-G-D
+// Blake de Armas
 #include "ChronogyLogs.h"
 
 DEFINE_LOG_CATEGORY(LogChronogy);

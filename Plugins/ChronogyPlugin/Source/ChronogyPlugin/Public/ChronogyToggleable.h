@@ -1,4 +1,4 @@
-// S-G-D
+// Blake de Armas
 
 #pragma once
 

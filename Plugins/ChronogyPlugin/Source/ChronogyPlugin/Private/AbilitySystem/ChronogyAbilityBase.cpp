@@ -1,4 +1,4 @@
-// S-G-D
+// Blake de Armas
 
 
 #include "AbilitySystem/ChronogyAbilityBase.h"

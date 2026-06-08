@@ -1,4 +1,4 @@
-// S-G-D
+// Blake de Armas
 
 #include "ChronogyDestructable.h"
 #include "ChronogyComponent.h"

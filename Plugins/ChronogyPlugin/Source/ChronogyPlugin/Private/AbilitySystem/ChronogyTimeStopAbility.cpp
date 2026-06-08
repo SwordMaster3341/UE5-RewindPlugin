@@ -1,4 +1,4 @@
-// S-G-D
+// Blake de Armas
 
 #include "AbilitySystem/ChronogyTimeStopAbility.h"
 #include "ChronogySubsystem.h"
