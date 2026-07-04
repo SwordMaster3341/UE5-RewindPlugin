@@ -15,7 +15,7 @@ void UChronogyRewindAbility::ActivateAbility(const FGameplayAbilitySpecHandle Ha
 
 	if (UWorld* World = GetWorld())
 	{
-		if (UChronogySubsystem* Subsystem = World->GetGameInstance()->GetSubsystem<UChronogySubsystem>())
+		if (UChronogySubsystem* Subsystem = World->GetSubsystem<UChronogySubsystem>())
 		{
 			Subsystem->StartGlobalRewind();
 		}
@@ -26,7 +26,7 @@ void UChronogyRewindAbility::EndAbility(const FGameplayAbilitySpecHandle Handle,
 {
 	if (UWorld* World = GetWorld())
 	{
-		if (UChronogySubsystem* Subsystem = World->GetGameInstance()->GetSubsystem<UChronogySubsystem>())
+		if (UChronogySubsystem* Subsystem = World->GetSubsystem<UChronogySubsystem>())
 		{
 			Subsystem->StopGlobalRewind();
 		}

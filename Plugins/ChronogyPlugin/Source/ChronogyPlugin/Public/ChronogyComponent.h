@@ -140,6 +140,11 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Chronogy")
 	bool IsRewinding() const { return bIsRewinding; }
 
+	TOptional<float> GetOldestSnapshotTime() const
+	{
+		return SnapshotBuffer.Num() > 0 ? TOptional<float>(SnapshotBuffer[0].Timestamp) : TOptional<float>();
+	}
+
 private:
 	void RecordSnapshot();
 	void ApplySnapshotAtTime(float Timestamp);

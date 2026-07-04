@@ -8,14 +8,27 @@
 #include "NiagaraComponent.h"
 #include "NiagaraCommon.h"
 
+void UChronogySubsystem::Initialize(FSubsystemCollectionBase& Collection)
+{
+    Super::Initialize(Collection);
+    SpawnDelegateHandle = GetWorld()->AddOnActorSpawnedHandler(FOnActorSpawned::FDelegate::CreateUObject(this, &UChronogySubsystem::OnActorSpawned));
+}
+
+bool UChronogySubsystem::DoesSupportWorldType(const EWorldType::Type WorldType) const
+{
+    return WorldType == EWorldType::Game || WorldType == EWorldType::PIE;
+}
+
+float UChronogySubsystem::GetTimelineSeconds() const
+{
+    return GetWorld()->GetRealTimeSeconds() - TimelineOffset;
+}
+
 void UChronogySubsystem::Deinitialize()
 {
-    if (SpawnDelegateHandle.IsValid())
+    if (UWorld* World = GetWorld())
     {
-        if (UWorld* World = GetGameInstance()->GetWorld())
-        {
-            World->RemoveOnActorSpawnedHandler(SpawnDelegateHandle);
-        }
+        World->RemoveOnActorSpawnedHandler(SpawnDelegateHandle);
     }
     Super::Deinitialize();
 }
@@ -26,20 +39,12 @@ void UChronogySubsystem::RegisterComponent(UChronogyComponent* Component)
     {
         RegisteredComponents.AddUnique(Component);
         UE_LOG(LogChronogy, Verbose, TEXT("ChronogySubsystem: registered '%s' (%d total)"), *Component->GetOwner()->GetName(), RegisteredComponents.Num());
-
-        if (!SpawnDelegateHandle.IsValid())
-        {
-            if (UWorld* World = GetGameInstance()->GetWorld())
-            {
-                SpawnDelegateHandle = World->AddOnActorSpawnedHandler(FOnActorSpawned::FDelegate::CreateUObject(this, &UChronogySubsystem::OnActorSpawned));
-            }
-        }
     }
 }
 
 void UChronogySubsystem::OnActorSpawned(AActor* Actor)
 {
-    if (!Actor || !GetGameInstance()->GetWorld()->HasBegunPlay()) return;
+    if (!Actor || !GetWorld()->HasBegunPlay()) return;
 
     UChronogyComponent* CC = Actor->FindComponentByClass<UChronogyComponent>();
     if (CC && CC->bShouldTrackSpawn)
@@ -59,7 +64,8 @@ void UChronogySubsystem::StartGlobalRewind()
     if (bIsRewinding) return;
 
     bIsRewinding = true;
-    CurrentRewindTimestamp = GetGameInstance()->GetWorld()->GetRealTimeSeconds();
+    CurrentRewindTimestamp = GetTimelineSeconds();
+    LastRealTimeSeconds    = GetWorld()->GetRealTimeSeconds();
     UE_LOG(LogChronogy, Log, TEXT("ChronogySubsystem: global rewind started (speed=%.2f, components=%d, tracked actors=%d)"), GlobalRewindSpeed, RegisteredComponents.Num(), SpawnedActorRecords.Num());
 
     OnRewindStarted.Broadcast();
@@ -70,6 +76,7 @@ void UChronogySubsystem::StopGlobalRewind()
     if (!bIsRewinding) return;
 
     bIsRewinding = false;
+    TimelineOffset = GetWorld()->GetRealTimeSeconds() - CurrentRewindTimestamp;
     UE_LOG(LogChronogy, Log, TEXT("ChronogySubsystem: global rewind stopped at T=%.3f"), CurrentRewindTimestamp);
 
     for (int32 i = SpawnedActorRecords.Num() - 1; i >= 0; --i)
@@ -92,7 +99,7 @@ void UChronogySubsystem::StopGlobalRewind()
         }
     }
 
-    const float Now = GetGameInstance()->GetWorld()->GetRealTimeSeconds();
+    const float Now = GetTimelineSeconds();
     for (int32 i = FXTracks.Num() - 1; i >= 0; --i)
     {
         FChronogyParticleTrack& Track = FXTracks[i];
@@ -122,61 +129,87 @@ void UChronogySubsystem::TrackSpawnedActor(AActor* Actor)
     if (!Actor) return;
     FChronogySpawnRecord& Record = SpawnedActorRecords.AddDefaulted_GetRef();
     Record.SpawnedActor    = Actor;
-    Record.SpawnTimestamp  = GetGameInstance()->GetWorld()->GetRealTimeSeconds();
+    Record.SpawnTimestamp  = GetTimelineSeconds();
     UE_LOG(LogChronogy, Verbose, TEXT("ChronogySubsystem: tracking '%s' at T=%.3f"), *Actor->GetName(), Record.SpawnTimestamp);
 }
 
-void UChronogySubsystem::OnRewindTick(float Timestamp)
+void UChronogySubsystem::Tick(float DeltaTime)
 {
-    if (GFrameCounter == LastRewindTickFrame) return;
-    LastRewindTickFrame    = GFrameCounter;
-    CurrentRewindTimestamp = Timestamp;
+    Super::Tick(DeltaTime);
 
-    for (const FChronogySpawnRecord& Record : SpawnedActorRecords)
+    const float RealNow   = GetWorld()->GetRealTimeSeconds();
+    const float RealDelta = RealNow - LastRealTimeSeconds;
+    LastRealTimeSeconds   = RealNow;
+
+    if (bIsRewinding)
     {
-        if (Record.SpawnedActor.IsValid())
+        CurrentRewindTimestamp -= RealDelta * GlobalRewindSpeed;
+
+        float EarliestRecorded = TNumericLimits<float>::Max();
+        for (const TWeakObjectPtr<UChronogyComponent>& Component : RegisteredComponents)
         {
-            Record.SpawnedActor->SetActorHiddenInGame(Record.SpawnTimestamp > Timestamp);
+            if (Component.IsValid())
+            {
+                const TOptional<float> Oldest = Component->GetOldestSnapshotTime();
+                if (Oldest.IsSet())
+                {
+                    EarliestRecorded = FMath::Min(EarliestRecorded, Oldest.GetValue());
+                }
+            }
+        }
+        if (EarliestRecorded != TNumericLimits<float>::Max())
+        {
+            CurrentRewindTimestamp = FMath::Max(CurrentRewindTimestamp, EarliestRecorded);
+        }
+
+        for (const FChronogySpawnRecord& Record : SpawnedActorRecords)
+        {
+            if (Record.SpawnedActor.IsValid())
+            {
+                Record.SpawnedActor->SetActorHiddenInGame(Record.SpawnTimestamp > CurrentRewindTimestamp);
+            }
+        }
+
+        // CurrentRewindTimestamp is the absolute rewind clock; each FX system's age is (clock - BirthTime).
+        for (int32 i = FXTracks.Num() - 1; i >= 0; --i)
+        {
+            if (FXTracks[i].Component.IsValid())
+                ApplyTrackAgeAtTime(FXTracks[i], CurrentRewindTimestamp);
+            else
+                FXTracks.RemoveAt(i, 1, EAllowShrinking::No);
         }
     }
-
-    // Timestamp is the absolute rewind clock; each FX system's age is (clock - BirthTime).
-    for (int32 i = FXTracks.Num() - 1; i >= 0; --i)
+    else
     {
-        if (FXTracks[i].Component.IsValid())
-            ApplyTrackAgeAtTime(FXTracks[i], Timestamp);
-        else
-            FXTracks.RemoveAt(i, 1, EAllowShrinking::No);
+        // Drive detached FX age forward during normal play, mirroring the owner-attached path. Keeping
+        // them age-driven the whole time (instead of switching modes at rewind boundaries) is what lets
+        // them resume cleanly after a rewind without vanishing.
+        const float TimelineNow = RealNow - TimelineOffset;
+        for (int32 i = FXTracks.Num() - 1; i >= 0; --i)
+        {
+            if (FXTracks[i].Component.IsValid())
+                PollTrackActivation(FXTracks[i], TimelineNow);
+            else
+                FXTracks.RemoveAt(i, 1, EAllowShrinking::No);
+        }
     }
 }
 
-void UChronogySubsystem::OnForwardTick(float RealNow)
+TStatId UChronogySubsystem::GetStatId() const
 {
-    if (GFrameCounter == LastForwardTickFrame) return;
-    LastForwardTickFrame = GFrameCounter;
-
-    // Drive detached FX age forward during normal play, mirroring the owner-attached path. Keeping
-    // them age-driven the whole time (instead of switching modes at rewind boundaries) is what lets
-    // them resume cleanly after a rewind without vanishing.
-    for (int32 i = FXTracks.Num() - 1; i >= 0; --i)
-    {
-        if (FXTracks[i].Component.IsValid())
-            PollTrackActivation(FXTracks[i], RealNow);
-        else
-            FXTracks.RemoveAt(i, 1, EAllowShrinking::No);
-    }
+    RETURN_QUICK_DECLARE_CYCLE_STAT(UChronogySubsystem, STATGROUP_Tickables);
 }
 
 void UChronogySubsystem::SetTimeDilation(float Dilation)
 {
     CurrentTimeDilation = Dilation;
-    UGameplayStatics::SetGlobalTimeDilation(GetGameInstance()->GetWorld(), Dilation);
+    UGameplayStatics::SetGlobalTimeDilation(GetWorld(), Dilation);
 }
 
 void UChronogySubsystem::ResetTimeDilation()
 {
     CurrentTimeDilation = 1.0f;
-    UGameplayStatics::SetGlobalTimeDilation(GetGameInstance()->GetWorld(), 1.0f);
+    UGameplayStatics::SetGlobalTimeDilation(GetWorld(), 1.0f);
 }
 
 void UChronogySubsystem::RegisterRewindableFX(UNiagaraComponent* FXComponent, EChronogyParticleRewindMode Mode)
@@ -187,7 +220,7 @@ void UChronogySubsystem::RegisterRewindableFX(UNiagaraComponent* FXComponent, EC
     Track.Component  = FXComponent;
     Track.Mode       = Mode;
     Track.bWasActive = FXComponent->IsActive();
-    Track.BirthTime  = Track.bWasActive ? GetGameInstance()->GetWorld()->GetRealTimeSeconds() : -1.f;
+    Track.BirthTime  = Track.bWasActive ? GetTimelineSeconds() : -1.f;
     Track.DeathAge   = -1.f;
 
     // A one-shot that auto-destroys on completion would be gone before we could reverse it.

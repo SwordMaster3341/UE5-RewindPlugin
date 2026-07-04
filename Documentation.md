@@ -22,12 +22,12 @@ This plugin is mainly built around 3 core pieces and a set of optional extension
 
 ### ChronogySubsystem
 
-The ChronogySubsystem is a **GameInstanceSubsystem** that owns the global rewind state. It doesn't do any recording itself, it just broadcasts when rewind is started or completed while simultaneously exposing the controls for StartGlobalRewind and StopGlobalRewind. 
+The ChronogySubsystem is a **WorldSubsystem** that owns the global rewind state. It doesn't do any recording itself, it just broadcasts when rewind is started or completed while simultaneously exposing the controls for StartGlobalRewind and StopGlobalRewind. 
 
 Essentially, if something with time is happening this subsystem is the main broadcast.
 
 **Quick Note:**
-The subsystem cannot tick itself, so the registered components drive it by calling **OnRewindTick**/**OnForwardTick** on the subsystem each frame. This is intentional and keeps the rewind clock aligned with the components that actually own its data.
+The subsystem ticks itself and owns the rewind clock. While rewinding it advances the clock each frame and floors it at the earliest snapshot still held by any registered component; components read the clock through **GetCurrentRewindTimestamp**.
 
 ### Chronogy Component
 
@@ -43,7 +43,7 @@ It walks the buffer backwards, applying the snapshot at the current rewind times
 
 Please note, physics are paused on the owner's primitive root during rewind. This was done because the position, rotation, and velocity from the snapshots replay the physics without fighting the engine. Upon completion of a rewind, the physics are re-enabled so the actor resumes motion clearly instead of ragdolling.
 
-Each optional feature has its own parallel ring buffer (**LightBuffer**, **MaterialBuffer**,**BonePoseBuffer**) so you only need to pay for what you turn on. Snapshots are timestamped with **GetRealTimeSeconds()** rather than game time, so the recording stays consistent even when time dilation (such as slow motion/ time stop) is active.
+Each optional feature has its own parallel ring buffer (**LightBuffer**, **MaterialBuffer**,**BonePoseBuffer**) so you only need to pay for what you turn on. Snapshots are timestamped with the subsystem's timeline clock (**GetTimelineSeconds**), which runs on real time rather than game time, so recording stays consistent when time dilation (such as slow motion/time stop) is active. The timeline resumes from wherever a rewind stops, keeping snapshots recorded before and after a rewind on one continuous axis.
 
 **Lifecycle:**
 

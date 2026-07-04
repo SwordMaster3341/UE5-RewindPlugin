@@ -42,7 +42,7 @@ void AChronogyDestructable::BeginPlay()
 	// Remember whether the intact cube is a physics body so we can re-enable it after reassembly.
 	bIntactSimulatesPhysics = IntactMesh && IntactMesh->BodyInstance.bSimulatePhysics;
 
-	Subsystem = GetWorld()->GetGameInstance()->GetSubsystem<UChronogySubsystem>();
+	Subsystem = GetWorld()->GetSubsystem<UChronogySubsystem>();
 	if (Subsystem)
 	{
 		// Fragments are non-root simulating bodies, so the sibling UChronogyComponent (which only
@@ -128,7 +128,7 @@ void AChronogyDestructable::TriggerDestructionWithImpulse(FVector Origin, float 
 	const FVector InheritedAngVel    = bRootWasSimulating ? IntactMesh->GetPhysicsAngularVelocityInRadians() : FVector::ZeroVector;
 
 	bFractured        = true;
-	FractureTimestamp = GetWorld()->GetRealTimeSeconds();
+	FractureTimestamp = Subsystem ? Subsystem->GetTimelineSeconds() : GetWorld()->GetRealTimeSeconds();
 
 	// Reassemble the fragments at the cube's CURRENT pose before breaking. While intact they are
 	// hidden, and once a prior shatter detached them via physics they no longer follow the moving
@@ -170,7 +170,7 @@ void AChronogyDestructable::TriggerDestructionWithImpulse(FVector Origin, float 
 
 void AChronogyDestructable::CaptureSnapshot()
 {
-	const float Now = GetWorld()->GetRealTimeSeconds();
+	const float Now = Subsystem ? Subsystem->GetTimelineSeconds() : GetWorld()->GetRealTimeSeconds();
 
 	// State buffer is a step function — only append when the state actually changes.
 	if (StateBuffer.Num() == 0 || StateBuffer.Last().bFractured != bFractured)

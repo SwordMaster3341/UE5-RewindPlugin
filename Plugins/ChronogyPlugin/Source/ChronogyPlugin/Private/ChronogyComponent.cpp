@@ -172,12 +172,7 @@ void UChronogyComponent::BeginPlay()
 		BonePoseBuffer.Reserve(MaxBonePoseCount);
 	}
 
-	if (bSnapshotParticles)
-	{
-		DiscoverParticleComponents();
-	}
-
-	Subsystem = GetWorld()->GetGameInstance()->GetSubsystem<UChronogySubsystem>();
+	Subsystem = GetWorld()->GetSubsystem<UChronogySubsystem>();
 	if (Subsystem)
 	{
 		Subsystem->RegisterComponent(this);
@@ -188,6 +183,11 @@ void UChronogyComponent::BeginPlay()
 	else
 	{
 		UE_LOG(LogChronogy, Error, TEXT("[%s] ChronogySubsystem not found — component will not rewind."), *GetOwner()->GetName());
+	}
+
+	if (bSnapshotParticles)
+	{
+		DiscoverParticleComponents();
 	}
 
 	LastRealTimeSeconds = GetWorld()->GetRealTimeSeconds();
@@ -226,8 +226,10 @@ void UChronogyComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAc
 
 	if (bIsRewinding)
 	{
-		float RewindSpeed = Subsystem ? Subsystem->GlobalRewindSpeed : 1.0f;
-		RewindPlaybackTime -= RealDelta * RewindSpeed;
+		if (Subsystem)
+		{
+			RewindPlaybackTime = Subsystem->GetCurrentRewindTimestamp();
+		}
 		ApplySnapshotAtTime(RewindPlaybackTime);
 		PlayBonePoseSnapshots();
 
@@ -248,14 +250,12 @@ void UChronogyComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAc
 			? FMath::Max(RewindPlaybackTime, SnapshotBuffer[0].Timestamp)
 			: RewindPlaybackTime;
 		if (bSnapshotParticles) ApplyParticlesAtTime(ParticleClock);
-		if (Subsystem) Subsystem->OnRewindTick(ParticleClock);
 	}
 	else
 	{
 		// This fixes a bug with rewinding that upon a player entering the game and then immediately rewinding,
 		// the particles do not despawn
-		if (bSnapshotParticles) PollParticleActivations(RealNow);
-		if (Subsystem) Subsystem->OnForwardTick(RealNow);
+		if (bSnapshotParticles) PollParticleActivations(Subsystem ? Subsystem->GetTimelineSeconds() : RealNow);
 
 		// Use real delta so snapshot intervals are consistent during time dilation
 		TimeSinceLastSnapshot += RealDelta;
@@ -299,7 +299,7 @@ Simple broadcast to scream that rewind has started or ended, which lets the comp
 void UChronogyComponent::OnRewindStarted()
 {
 	bIsRewinding = true;
-	RewindPlaybackTime = GetWorld()->GetRealTimeSeconds();
+	RewindPlaybackTime = Subsystem ? Subsystem->GetCurrentRewindTimestamp() : GetWorld()->GetRealTimeSeconds();
 
 	UE_LOG(LogChronogy, Log, TEXT("[%s] Rewind started. Snapshots: %d/%d  BonePoses: %d/%d"),
 		*GetOwner()->GetName(), static_cast<int32>(SnapshotBuffer.Num()), MaxSnapshotCount, static_cast<int32>(BonePoseBuffer.Num()), MaxBonePoseCount);
@@ -408,7 +408,7 @@ void UChronogyComponent::RecordSnapshot()
 	}
 
 	FChronogySnapshot Snap;
-	Snap.Timestamp = GetWorld()->GetRealTimeSeconds();
+	Snap.Timestamp = Subsystem ? Subsystem->GetTimelineSeconds() : GetWorld()->GetRealTimeSeconds();
 	Snap.Location  = GetOwner()->GetActorLocation();
 	Snap.Rotation  = GetOwner()->GetActorQuat();
 
@@ -461,7 +461,7 @@ void UChronogyComponent::RecordSnapshot()
 				BonePoseBuffer.PopFront();
 
 			FChronogyPoseSnapshot& PoseSnap = BonePoseBuffer.Emplace_GetRef();
-			PoseSnap.Timestamp = GetWorld()->GetRealTimeSeconds();
+			PoseSnap.Timestamp = Snap.Timestamp;
 			OwnerSkeletalMesh->SnapshotPose(PoseSnap.PoseSnapshot);
 		}
 	}
@@ -711,7 +711,7 @@ void UChronogyComponent::DiscoverParticleComponents()
 	TArray<UNiagaraComponent*> Comps;
 	GetOwner()->GetComponents<UNiagaraComponent>(Comps);
 
-	const float Now = GetWorld()->GetRealTimeSeconds();
+	const float Now = Subsystem ? Subsystem->GetTimelineSeconds() : GetWorld()->GetRealTimeSeconds();
 	for (UNiagaraComponent* C : Comps)
 	{
 		if (!C) { continue; }
@@ -759,7 +759,7 @@ void UChronogyComponent::EndParticleRewind(float FromTimestamp)
 {
 	// Re-anchor each system's birth to real time at the stopped rewind clock so forward play
 	// continues from exactly the age the rewind landed on (RestoreTrack also unpauses Freeze).
-	const float Now = GetWorld()->GetRealTimeSeconds();
+	const float Now = Subsystem ? Subsystem->GetTimelineSeconds() : GetWorld()->GetRealTimeSeconds();
 	for (FChronogyParticleTrack& Track : ParticleTracks)
 	{
 		UChronogySubsystem::RestoreTrack(Track, FromTimestamp, Now);

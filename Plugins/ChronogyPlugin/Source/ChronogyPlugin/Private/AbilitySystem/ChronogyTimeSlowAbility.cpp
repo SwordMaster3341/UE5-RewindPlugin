@@ -14,7 +14,7 @@ void UChronogyTimeSlowAbility::ActivateAbility(const FGameplayAbilitySpecHandle 
         return;
     }
 
-    if (UChronogySubsystem* Subsystem = GetWorld()->GetGameInstance()->GetSubsystem<UChronogySubsystem>())
+    if (UChronogySubsystem* Subsystem = GetWorld()->GetSubsystem<UChronogySubsystem>())
     {
         Subsystem->SetTimeDilation(TimeDilation);
     }
@@ -27,7 +27,7 @@ void UChronogyTimeSlowAbility::ActivateAbility(const FGameplayAbilitySpecHandle 
 
 void UChronogyTimeSlowAbility::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
-    if (UChronogySubsystem* Subsystem = GetWorld()->GetGameInstance()->GetSubsystem<UChronogySubsystem>())
+    if (UChronogySubsystem* Subsystem = GetWorld()->GetSubsystem<UChronogySubsystem>())
     {
         Subsystem->ResetTimeDilation();
     }

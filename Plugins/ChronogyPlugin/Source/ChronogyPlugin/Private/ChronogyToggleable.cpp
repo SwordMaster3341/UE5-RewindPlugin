@@ -2,6 +2,7 @@
 
 #include "ChronogyToggleable.h"
 #include "ChronogyComponent.h"
+#include "ChronogySubsystem.h"
 #include "ChronogyLogs.h"
 #include "Components/StaticMeshComponent.h"
 
@@ -38,8 +39,10 @@ void AChronogyToggleable::CaptureSnapshot()
 		FrameBuffer.PopFront();
 	}
 
+	const UChronogySubsystem* Subsystem = GetWorld()->GetSubsystem<UChronogySubsystem>();
+
 	FChronogyToggleableFrame& Frame = FrameBuffer.Emplace_GetRef();
-	Frame.Timestamp = GetWorld()->GetRealTimeSeconds();
+	Frame.Timestamp = Subsystem ? Subsystem->GetTimelineSeconds() : GetWorld()->GetRealTimeSeconds();
 	Frame.bIsOn     = bIsOn;
 }
 

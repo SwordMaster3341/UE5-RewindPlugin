@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Subsystems/GameInstanceSubsystem.h"
+#include "Subsystems/WorldSubsystem.h"
 #include "ChronogyParticle.h"
 #include "ChronogySubsystem.generated.h"
 
@@ -25,22 +25,23 @@ struct FChronogySpawnRecord
 
 
 UCLASS()
-class CHRONOGYPLUGIN_API UChronogySubsystem : public UGameInstanceSubsystem
+class CHRONOGYPLUGIN_API UChronogySubsystem : public UTickableWorldSubsystem
 {
 	GENERATED_BODY()
 
 public:
+	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	virtual void Deinitialize() override;
+	virtual bool DoesSupportWorldType(const EWorldType::Type WorldType) const override;
+
+	virtual void Tick(float DeltaTime) override;
+	virtual TStatId GetStatId() const override;
 
 	//Component Registration
 	void RegisterComponent(UChronogyComponent* Component);
 	void UnregisterComponent(UChronogyComponent* Component);
 
 	void TrackSpawnedActor(AActor* Actor);
-
-	//Subsystem can't tick itself, so these are called by registered components to drive rewind.
-	void OnRewindTick(float Timestamp);
-	void OnForwardTick(float DeltaSeconds);
 
 	// Register a detached one-shot Niagara system (e.g. from SpawnSystemAtLocation) so it
 	// reverses with the global rewind. Must still be alive when rewind starts.
@@ -82,6 +83,8 @@ public:
 
 	float GetCurrentRewindTimestamp() const { return CurrentRewindTimestamp; }
 
+	float GetTimelineSeconds() const;
+
 	FOnGlobalRewindStarted OnRewindStarted;
 	FOnGlobalRewindCompleted OnRewindCompleted;
 
@@ -97,8 +100,8 @@ private:
 	TArray<FChronogyParticleTrack>             FXTracks;
 
 	float   CurrentRewindTimestamp = 0.0f;
-	uint64  LastRewindTickFrame    = 0;
-	uint64  LastForwardTickFrame   = 0;
+	float   LastRealTimeSeconds    = 0.0f;
+	float   TimelineOffset         = 0.0f;
 	
 
 
