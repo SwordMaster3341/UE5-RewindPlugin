@@ -19,7 +19,6 @@ class CHRONOGYPLUGIN_API UChronogyAbilityBase : public UGameplayAbility
 {
 	GENERATED_BODY()
 
-
 public:
 	//The attribute to check and deduct when this ability activates
 	//Remember to set this in the ability Blueprint defaults (pointing it to mana, ect...)
@@ -33,5 +32,4 @@ public:
 	virtual bool CheckCost(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, OUT FGameplayTagContainer* OptionalRelevantTags) const override;
 
 	virtual void ApplyCost(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo) const override;
-
 };

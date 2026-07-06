@@ -19,10 +19,8 @@ struct FChronogySpawnRecord
 	GENERATED_BODY()
 
 	TWeakObjectPtr<AActor> SpawnedActor;
-	float                  SpawnTimestamp = 0.0f;
+	float SpawnTimestamp = 0.0f;
 };
-
-
 
 UCLASS()
 class CHRONOGYPLUGIN_API UChronogySubsystem : public UTickableWorldSubsystem
@@ -57,7 +55,6 @@ public:
 	static void ApplyTrackAgeAtTime(FChronogyParticleTrack& Track, float RewindClock);
 	static void RestoreTrack(FChronogyParticleTrack& Track, float StopClock, float Now);
 
-
 	//Broadcasting events to registered components
 
 	UFUNCTION(BlueprintCallable, Category = "Chronogy")
@@ -81,7 +78,10 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "Chronogy")
 	bool bIsRewinding = false;
 
-	float GetCurrentRewindTimestamp() const { return CurrentRewindTimestamp; }
+	float GetCurrentRewindTimestamp() const
+	{
+		return CurrentRewindTimestamp;
+	}
 
 	float GetTimelineSeconds() const;
 
@@ -93,18 +93,13 @@ private:
 	void OnActorSpawned(AActor* Actor);
 
 	TArray<TWeakObjectPtr<UChronogyComponent>> RegisteredComponents;
-	TArray<FChronogySpawnRecord>               SpawnedActorRecords;
-	FDelegateHandle                            SpawnDelegateHandle;
+	TArray<FChronogySpawnRecord> SpawnedActorRecords;
+	FDelegateHandle SpawnDelegateHandle;
 
 	UPROPERTY()
-	TArray<FChronogyParticleTrack>             FXTracks;
+	TArray<FChronogyParticleTrack> FXTracks;
 
-	float   CurrentRewindTimestamp = 0.0f;
-	float   LastRealTimeSeconds    = 0.0f;
-	float   TimelineOffset         = 0.0f;
-	
-
-
-	
-	
+	float CurrentRewindTimestamp = 0.0f;
+	float LastRealTimeSeconds = 0.0f;
+	float TimelineOffset = 0.0f;
 };

@@ -36,12 +36,12 @@ struct FChronogySnapshot
 {
 	GENERATED_BODY()
 
-	float   Timestamp       = 0.0f;
-	FVector Location        = FVector::ZeroVector;
-	FQuat   Rotation        = FQuat::Identity;
-	FVector LinearVelocity  = FVector::ZeroVector;
+	float Timestamp = 0.0f;
+	FVector Location = FVector::ZeroVector;
+	FQuat Rotation = FQuat::Identity;
+	FVector LinearVelocity = FVector::ZeroVector;
 	FVector AngularVelocity = FVector::ZeroVector;
-	uint8   MovementMode    = 0;
+	uint8 MovementMode = 0;
 };
 
 USTRUCT()
@@ -49,7 +49,7 @@ struct FChronogyPoseSnapshot
 {
 	GENERATED_BODY()
 
-	float         Timestamp    = 0.0f;
+	float Timestamp = 0.0f;
 	FPoseSnapshot PoseSnapshot;
 };
 
@@ -58,8 +58,8 @@ struct FChronogyLightFrame
 {
 	GENERATED_BODY()
 
-	float        Timestamp  = 0.0f;
-	float        Intensity  = 0.0f;
+	float Timestamp = 0.0f;
+	float Intensity = 0.0f;
 	FLinearColor LightColor = FLinearColor::White;
 };
 
@@ -68,13 +68,13 @@ struct FChronogyMaterialFrame
 {
 	GENERATED_BODY()
 
-	float                          Timestamp = 0.0f;
+	float Timestamp = 0.0f;
 	TWeakObjectPtr<UMaterialInterface> Material;
-	TArray<float>                  ScalarValues;
-	TArray<FLinearColor>           VectorValues;
+	TArray<float> ScalarValues;
+	TArray<FLinearColor> VectorValues;
 };
 
-UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
+UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class CHRONOGYPLUGIN_API UChronogyComponent : public UActorComponent
 {
 	GENERATED_BODY()
@@ -136,9 +136,16 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "Chronogy", meta = (EditCondition = "bSnapshotParticles", ClampMin = "0.005"))
 	float ParticleSeekDelta = 0.0166f;
 
+	// Longest age (seconds) a Scrub system is re-simulated to. Backward seeks replay from age 0, so this bounds their cost. Raise it for effects whose appearance still changes after this many seconds.
+	UPROPERTY(EditDefaultsOnly, Category = "Chronogy", meta = (EditCondition = "bSnapshotParticles", ClampMin = "1.0"))
+	float ParticleMaxScrubSeconds = 5.0f;
+
 	// Read-only query used by anim graphs and interface implementors to know when rewind is active.
 	UFUNCTION(BlueprintPure, Category = "Chronogy")
-	bool IsRewinding() const { return bIsRewinding; }
+	bool IsRewinding() const
+	{
+		return bIsRewinding;
+	}
 
 	TOptional<float> GetOldestSnapshotTime() const
 	{
@@ -165,42 +172,42 @@ private:
 	void OnRewindCompleted();
 
 	// TRingBuffers my love, memory management made easy (I did this with arrays first ima cry)
-	TRingBuffer<FChronogySnapshot>     SnapshotBuffer;
+	TRingBuffer<FChronogySnapshot> SnapshotBuffer;
 	TRingBuffer<FChronogyPoseSnapshot> BonePoseBuffer;
-	TRingBuffer<FChronogyLightFrame>   LightBuffer;
+	TRingBuffer<FChronogyLightFrame> LightBuffer;
 	TRingBuffer<FChronogyMaterialFrame> MaterialBuffer;
 
 	UPROPERTY()
 	TArray<FChronogyParticleTrack> ParticleTracks;
 
-	IChronogySnapshotInterface*   SnapshotInterface = nullptr;
+	IChronogySnapshotInterface* SnapshotInterface = nullptr;
 
 	TArray<FName> DetectedScalarParams;
 	TArray<FName> DetectedVectorParams;
 
-	bool  bIsRewinding                = false;
-	bool  bPausedPhysics              = false;
-	float TimeSinceLastSnapshot       = 0.0f;
-	float RewindPlaybackTime          = 0.0f;
-	float LastRealTimeSeconds         = 0.0f;
-	int32 MaxSnapshotCount            = 0;
-	int32 MaxBonePoseCount            = 0;
+	bool bIsRewinding = false;
+	bool bPausedPhysics = false;
+	float TimeSinceLastSnapshot = 0.0f;
+	float RewindPlaybackTime = 0.0f;
+	float LastRealTimeSeconds = 0.0f;
+	int32 MaxSnapshotCount = 0;
+	int32 MaxBonePoseCount = 0;
 	int32 FramesSinceLastBoneSnapshot = 0;
 
 	// Cached owner component references that prevent dangling nullpointers during rewind when components may be destroyed and re-created.
 	// Still, why the heck are you destroying and re-creating components during rewind, don't do that, it's not gonna end well.
 	UPROPERTY()
-	TObjectPtr<UPrimitiveComponent>         OwnerRootComponent     = nullptr;
+	TObjectPtr<UPrimitiveComponent> OwnerRootComponent = nullptr;
 	UPROPERTY()
 	TObjectPtr<UCharacterMovementComponent> OwnerMovementComponent = nullptr;
 	UPROPERTY()
-	TObjectPtr<USkeletalMeshComponent>      OwnerSkeletalMesh      = nullptr;
+	TObjectPtr<USkeletalMeshComponent> OwnerSkeletalMesh = nullptr;
 	UPROPERTY()
-	TObjectPtr<ULightComponent>             OwnerLightComponent    = nullptr;
+	TObjectPtr<ULightComponent> OwnerLightComponent = nullptr;
 	UPROPERTY()
-	TObjectPtr<UMeshComponent>              OwnerMeshComponent     = nullptr;
+	TObjectPtr<UMeshComponent> OwnerMeshComponent = nullptr;
 	UPROPERTY()
-	TObjectPtr<UMaterialInstanceDynamic>    OwnerDynMat            = nullptr;
+	TObjectPtr<UMaterialInstanceDynamic> OwnerDynMat = nullptr;
 	UPROPERTY()
-	TObjectPtr<UChronogySubsystem>          Subsystem              = nullptr;
+	TObjectPtr<UChronogySubsystem> Subsystem = nullptr;
 };

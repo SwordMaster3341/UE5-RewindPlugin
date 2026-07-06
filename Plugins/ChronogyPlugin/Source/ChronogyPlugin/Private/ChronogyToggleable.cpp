@@ -24,7 +24,10 @@ void AChronogyToggleable::BeginPlay()
 
 void AChronogyToggleable::SetToggleState(bool bNewState)
 {
-	if (bIsOn == bNewState) { return; }
+	if (bIsOn == bNewState)
+	{
+		return;
+	}
 	bIsOn = bNewState;
 	UE_LOG(LogChronogy, Log, TEXT("[%s] Toggleable -> %s"), *GetName(), bIsOn ? TEXT("ON") : TEXT("OFF"));
 	OnToggleableStateChanged.Broadcast(bIsOn);
@@ -43,12 +46,15 @@ void AChronogyToggleable::CaptureSnapshot()
 
 	FChronogyToggleableFrame& Frame = FrameBuffer.Emplace_GetRef();
 	Frame.Timestamp = Subsystem ? Subsystem->GetTimelineSeconds() : GetWorld()->GetRealTimeSeconds();
-	Frame.bIsOn     = bIsOn;
+	Frame.bIsOn = bIsOn;
 }
 
 void AChronogyToggleable::ApplySnapshot(float Timestamp)
 {
-	if (FrameBuffer.Num() == 0) { return; }
+	if (FrameBuffer.Num() == 0)
+	{
+		return;
+	}
 
 	// Clamp to oldest recorded state
 	if (Timestamp <= FrameBuffer[0].Timestamp)

@@ -62,8 +62,19 @@ struct FChronogyParticleTrack
 	// backward re-sim cost to the effect's real lifetime.
 	float DeathAge = -1.0f;
 
+	// Ceiling on the age fed to a Scrub seek. A backward seek re-simulates from age 0 under a
+	// ~33ms-per-frame engine budget that discards whatever ticks don't fit, so unbounded ages leave
+	// long-lived systems rendered half-built. Visibility gating still uses the real age.
+	float MaxScrubAge = 5.0f;
+
 	// Edge-detection of activation: inactive -> active = birth, active -> inactive = death.
 	bool bWasActive = false;
+
+	// The component's authored bAutoActivate. The engine re-activates an inactive auto-activate
+	// component every tick, fighting the rewind's deactivation of systems that do not exist yet at
+	// the current rewind time, so the flag is cleared while a system is rewound out of existence
+	// and restored from here when the rewind stops.
+	bool bOwnerAutoActivate = false;
 
 	// True once solo + DesiredAge has been configured on the component (Scrub only, done once).
 	bool bScrubReady = false;

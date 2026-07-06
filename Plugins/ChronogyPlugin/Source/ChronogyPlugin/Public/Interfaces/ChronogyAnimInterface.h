@@ -7,7 +7,7 @@
 #include "Animation/PoseSnapshot.h"
 #include "ChronogyAnimInterface.generated.h"
 
-// UChronogyAnimInterface is the UObject shell required by UInterface. 
+// UChronogyAnimInterface is the UObject shell required by UInterface.
 UINTERFACE(MinimalAPI)
 class UChronogyAnimInterface : public UInterface
 {
@@ -32,7 +32,6 @@ class CHRONOGYPLUGIN_API IChronogyAnimInterface
 	GENERATED_BODY()
 
 public:
-
 	// Called each tick during rewind with the current blended pose. Store it and display it while bIsRewinding is true.
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Chronogy")
 	void PushRewindPoseSnapshot(const FPoseSnapshot& Snapshot);
@@ -40,6 +39,4 @@ public:
 	// Flags when to switch between normal playback and rewinding.
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Chronogy")
 	void SetIsRewinding(bool bIsRewinding);
-
-
 };

@@ -1,6 +1,5 @@
 // Blake de Armas
 
-
 #include "Interfaces/ChronogyAnimInterface.h"
 
 /*
@@ -15,4 +14,3 @@ corresponding to the .h file that declares the interface.
 DO NOT MODIFY THIS FILE LATER ME UNLESS YOU (REAALLLY) KNOW WHAT YOU ARE DOING.
 
 */
-

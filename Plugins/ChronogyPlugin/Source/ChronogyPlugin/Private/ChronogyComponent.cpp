@@ -6,6 +6,8 @@
 #include "ChronogyLogs.h"
 #include "Interfaces/ChronogyAnimInterface.h"
 #include "Interfaces/ChronogySnapshotInterface.h"
+
+//Engine Includes
 #include "Components/LightComponent.h"
 #include "Components/MeshComponent.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -17,18 +19,16 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "DrawDebugHelpers.h"
 
-
 /*
   This is the main component that handles rewinding for all actors.
 
-  A component was chosen as it is easily implementable and inheritable in blueprints, and can be added to any actor without 
-  modifying the actor's class. 
+  A component was chosen as it is easily implementable and inheritable in blueprints, and can be added to any actor without
+  modifying the actor's class.
 
   It also allows for per-actor customization of what is recorded and rewound (e.g. whether to record bone poses or light properties)
   saving on memory.
 
 */
-
 
 UChronogyComponent::UChronogyComponent()
 {
@@ -102,7 +102,8 @@ void UChronogyComponent::BeginPlay()
 				{
 					DetectedScalarParams.Add(Info.Name);
 				}
-				ParamInfos.Reset(); ParamGuids.Reset();
+				ParamInfos.Reset();
+				ParamGuids.Reset();
 				OwnerDynMat->GetAllVectorParameterInfo(ParamInfos, ParamGuids);
 				for (const FMaterialParameterInfo& Info : ParamInfos)
 				{
@@ -125,16 +126,16 @@ void UChronogyComponent::BeginPlay()
 	/*
 		This section calculates the minimum size of each snapshot based on what is recorded.
 
-		Please note that every single rewindable has a hard cap of 2mb per snapshot. 
+		Please note that every single rewindable has a hard cap of 2mb per snapshot.
 
-		You should almost never hit this cap, but if you do, the component will log a warning 
+		You should almost never hit this cap, but if you do, the component will log a warning
 		and skip recording that snapshot to avoid crashing.
 
 		The best thing you can do is to reduce the memory footprint of the snapshot or potentially increase the MaxMemoryBytes variable
 		, but be aware that increasing memory usage can lead to performance issues and OOM crashes if taken too far.
-	
+
 	*/
-	 
+
 	int32 BytesPerSnapshot = sizeof(FChronogySnapshot);
 	if (bSnapshotLightProperties && OwnerLightComponent)
 	{
@@ -142,16 +143,13 @@ void UChronogyComponent::BeginPlay()
 	}
 	if (bSnapshotMaterialParameters && OwnerDynMat)
 	{
-		BytesPerSnapshot += sizeof(FChronogyMaterialFrame)
-			+ DetectedScalarParams.Num() * static_cast<int32>(sizeof(float))
-			+ DetectedVectorParams.Num() * static_cast<int32>(sizeof(FLinearColor));
+		BytesPerSnapshot += sizeof(FChronogyMaterialFrame) + DetectedScalarParams.Num() * static_cast<int32>(sizeof(float)) + DetectedVectorParams.Num() * static_cast<int32>(sizeof(FLinearColor));
 	}
 
 	int32 BonePoseBytes = 0;
 	if (bSnapshotBonePoses && OwnerSkeletalMesh)
 	{
-		BonePoseBytes = sizeof(FChronogyPoseSnapshot)
-			+ OwnerSkeletalMesh->GetNumBones() * static_cast<int32>(sizeof(FTransform));
+		BonePoseBytes = sizeof(FChronogyPoseSnapshot) + OwnerSkeletalMesh->GetNumBones() * static_cast<int32>(sizeof(FTransform));
 		BytesPerSnapshot += BonePoseBytes / FMath::Max(1, BoneSnapshotFrameInterval);
 	}
 
@@ -160,8 +158,14 @@ void UChronogyComponent::BeginPlay()
 		FMath::Max(1, MaxMemoryBytes / BytesPerSnapshot));
 
 	SnapshotBuffer.Reserve(MaxSnapshotCount);
-	if (bSnapshotLightProperties && OwnerLightComponent) { LightBuffer.Reserve(MaxSnapshotCount); }
-	if (bSnapshotMaterialParameters && OwnerDynMat)      { MaterialBuffer.Reserve(MaxSnapshotCount); }
+	if (bSnapshotLightProperties && OwnerLightComponent)
+	{
+		LightBuffer.Reserve(MaxSnapshotCount);
+	}
+	if (bSnapshotMaterialParameters && OwnerDynMat)
+	{
+		MaterialBuffer.Reserve(MaxSnapshotCount);
+	}
 
 	if (bSnapshotBonePoses && OwnerSkeletalMesh)
 	{
@@ -193,7 +197,6 @@ void UChronogyComponent::BeginPlay()
 	LastRealTimeSeconds = GetWorld()->GetRealTimeSeconds();
 }
 
-
 // Unregister from subsystem to avoid dangling references and ensure clean end-play behavior.
 // Standard UE5 garbage collection
 void UChronogyComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -208,10 +211,9 @@ void UChronogyComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	Super::EndPlay(EndPlayReason);
 }
 
-
 /*
 	This component ticks every frame and either records snapshots or applies them depending on whether or not we are rewinding.
-	
+
 	The main logic behind the tracking.
 
 */
@@ -233,7 +235,6 @@ void UChronogyComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAc
 		ApplySnapshotAtTime(RewindPlaybackTime);
 		PlayBonePoseSnapshots();
 
-
 		/*
 		The particle clock is a highly important part of the rewind, as it is the only way particles can "rewind".
 
@@ -247,15 +248,17 @@ void UChronogyComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAc
 
 		*/
 		const float ParticleClock = SnapshotBuffer.Num() > 0
-			? FMath::Max(RewindPlaybackTime, SnapshotBuffer[0].Timestamp)
-			: RewindPlaybackTime;
-		if (bSnapshotParticles) ApplyParticlesAtTime(ParticleClock);
+										? FMath::Max(RewindPlaybackTime, SnapshotBuffer[0].Timestamp)
+										: RewindPlaybackTime;
+		if (bSnapshotParticles)
+			ApplyParticlesAtTime(ParticleClock);
 	}
 	else
 	{
 		// This fixes a bug with rewinding that upon a player entering the game and then immediately rewinding,
 		// the particles do not despawn
-		if (bSnapshotParticles) PollParticleActivations(Subsystem ? Subsystem->GetTimelineSeconds() : RealNow);
+		if (bSnapshotParticles)
+			PollParticleActivations(Subsystem ? Subsystem->GetTimelineSeconds() : RealNow);
 
 		// Use real delta so snapshot intervals are consistent during time dilation
 		TimeSinceLastSnapshot += RealDelta;
@@ -266,8 +269,8 @@ void UChronogyComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAc
 		}
 	}
 
-	// Debug tool showing lines on screen for your position history. 
-	// Yellow lines are the rewind path, green lines are the forward path. 
+	// Debug tool showing lines on screen for your position history.
+	// Yellow lines are the rewind path, green lines are the forward path.
 	// Spheres show current snapshot target.
 #if ENABLE_DRAW_DEBUG
 	if (CVarChronogyDebugDraw.GetValueOnGameThread() && SnapshotBuffer.Num() > 0)
@@ -351,8 +354,8 @@ void UChronogyComponent::OnRewindCompleted()
 	// Match the in-rewind particle clock clamp (see TickComponent). Compute the floored stop clock
 	// BEFORE EraseFutureSnapshots, which can empty the buffer and lose SnapshotBuffer[0].
 	const float ParticleStopClock = (bSnapshotParticles && SnapshotBuffer.Num() > 0)
-		? FMath::Max(RewindPlaybackTime, SnapshotBuffer[0].Timestamp)
-		: RewindPlaybackTime;
+										? FMath::Max(RewindPlaybackTime, SnapshotBuffer[0].Timestamp)
+										: RewindPlaybackTime;
 
 	EraseFutureSnapshots(RewindPlaybackTime);
 
@@ -370,8 +373,8 @@ void UChronogyComponent::OnRewindCompleted()
 UAnimInstance* UChronogyComponent::GetAnimInstance() const
 {
 	USkeletalMeshComponent* Mesh = OwnerSkeletalMesh
-		? OwnerSkeletalMesh.Get()
-		: GetOwner()->FindComponentByClass<USkeletalMeshComponent>();
+									   ? OwnerSkeletalMesh.Get()
+									   : GetOwner()->FindComponentByClass<USkeletalMeshComponent>();
 
 	if (!Mesh)
 	{
@@ -409,12 +412,12 @@ void UChronogyComponent::RecordSnapshot()
 
 	FChronogySnapshot Snap;
 	Snap.Timestamp = Subsystem ? Subsystem->GetTimelineSeconds() : GetWorld()->GetRealTimeSeconds();
-	Snap.Location  = GetOwner()->GetActorLocation();
-	Snap.Rotation  = GetOwner()->GetActorQuat();
+	Snap.Location = GetOwner()->GetActorLocation();
+	Snap.Rotation = GetOwner()->GetActorQuat();
 
 	if (OwnerRootComponent)
 	{
-		Snap.LinearVelocity  = OwnerRootComponent->GetPhysicsLinearVelocity();
+		Snap.LinearVelocity = OwnerRootComponent->GetPhysicsLinearVelocity();
 		Snap.AngularVelocity = OwnerRootComponent->GetPhysicsAngularVelocityInRadians();
 	}
 
@@ -430,8 +433,8 @@ void UChronogyComponent::RecordSnapshot()
 		if (static_cast<int32>(LightBuffer.Num()) >= MaxSnapshotCount)
 			LightBuffer.PopFront();
 		FChronogyLightFrame& LF = LightBuffer.Emplace_GetRef();
-		LF.Timestamp  = Snap.Timestamp;
-		LF.Intensity  = OwnerLightComponent->Intensity;
+		LF.Timestamp = Snap.Timestamp;
+		LF.Intensity = OwnerLightComponent->Intensity;
 		LF.LightColor = FLinearColor::FromSRGBColor(OwnerLightComponent->LightColor);
 	}
 
@@ -441,7 +444,7 @@ void UChronogyComponent::RecordSnapshot()
 			MaterialBuffer.PopFront();
 		FChronogyMaterialFrame& MF = MaterialBuffer.Emplace_GetRef();
 		MF.Timestamp = Snap.Timestamp;
-		MF.Material  = OwnerMeshComponent->GetMaterial(0);
+		MF.Material = OwnerMeshComponent->GetMaterial(0);
 		MF.ScalarValues.SetNumUninitialized(DetectedScalarParams.Num());
 		for (int32 i = 0; i < DetectedScalarParams.Num(); i++)
 			OwnerDynMat->GetScalarParameterValue(FMaterialParameterInfo(DetectedScalarParams[i]), MF.ScalarValues[i]);
@@ -474,7 +477,10 @@ void UChronogyComponent::RecordSnapshot()
 
 void UChronogyComponent::ApplySnapshotAtTime(float Timestamp)
 {
-	if (SnapshotBuffer.Num() == 0) { return; }
+	if (SnapshotBuffer.Num() == 0)
+	{
+		return;
+	}
 
 	// Clamp to the oldest recorded state
 	if (Timestamp <= SnapshotBuffer[0].Timestamp)
@@ -485,7 +491,10 @@ void UChronogyComponent::ApplySnapshotAtTime(float Timestamp)
 		{
 			OwnerMovementComponent->SetMovementMode(static_cast<EMovementMode>(Snap.MovementMode));
 		}
-		if (SnapshotInterface) { SnapshotInterface->ApplySnapshot(Timestamp); }
+		if (SnapshotInterface)
+		{
+			SnapshotInterface->ApplySnapshot(Timestamp);
+		}
 		return;
 	}
 
@@ -514,11 +523,11 @@ void UChronogyComponent::ApplySnapshotAtTime(float Timestamp)
 	// divide yields NaN, FMath::Clamp does not sanitize NaN, and the Lerp/Slerp produce garbage.
 	const float Range = Newer.Timestamp - Older.Timestamp;
 	const float Alpha = Range > KINDA_SMALL_NUMBER
-		? FMath::Clamp((Timestamp - Older.Timestamp) / Range, 0.f, 1.f)
-		: 1.f;
+							? FMath::Clamp((Timestamp - Older.Timestamp) / Range, 0.f, 1.f)
+							: 1.f;
 
 	const FVector BlendedLocation = FMath::Lerp(Older.Location, Newer.Location, Alpha);
-	const FQuat   BlendedRotation = FQuat::Slerp(Older.Rotation, Newer.Rotation, Alpha);
+	const FQuat BlendedRotation = FQuat::Slerp(Older.Rotation, Newer.Rotation, Alpha);
 
 	GetOwner()->SetActorLocationAndRotation(BlendedLocation, BlendedRotation, false, nullptr, ETeleportType::TeleportPhysics);
 
@@ -526,8 +535,8 @@ void UChronogyComponent::ApplySnapshotAtTime(float Timestamp)
 	{
 		// Discrete value — snap to whichever side of the midpoint we're on
 		const EMovementMode Mode = Alpha < 0.5f
-			? static_cast<EMovementMode>(Older.MovementMode)
-			: static_cast<EMovementMode>(Newer.MovementMode);
+									   ? static_cast<EMovementMode>(Older.MovementMode)
+									   : static_cast<EMovementMode>(Newer.MovementMode);
 		OwnerMovementComponent->SetMovementMode(Mode);
 	}
 
@@ -542,7 +551,10 @@ void UChronogyComponent::ApplySnapshotAtTime(float Timestamp)
 
 void UChronogyComponent::ApplyLightAtTime(float Timestamp)
 {
-	if (!bSnapshotLightProperties || !OwnerLightComponent || LightBuffer.Num() == 0) { return; }
+	if (!bSnapshotLightProperties || !OwnerLightComponent || LightBuffer.Num() == 0)
+	{
+		return;
+	}
 
 	if (Timestamp <= LightBuffer[0].Timestamp)
 	{
@@ -550,22 +562,27 @@ void UChronogyComponent::ApplyLightAtTime(float Timestamp)
 		OwnerLightComponent->SetLightColor(LightBuffer[0].LightColor);
 		return;
 	}
-	if (Timestamp >= LightBuffer.Last().Timestamp) { return; }
+	if (Timestamp >= LightBuffer.Last().Timestamp)
+	{
+		return;
+	}
 
 	int32 Lo = 0, Hi = static_cast<int32>(LightBuffer.Num()) - 1;
 	while (Lo + 1 < Hi)
 	{
 		const int32 Mid = (Lo + Hi) / 2;
-		if (LightBuffer[Mid].Timestamp <= Timestamp) Lo = Mid;
-		else Hi = Mid;
+		if (LightBuffer[Mid].Timestamp <= Timestamp)
+			Lo = Mid;
+		else
+			Hi = Mid;
 	}
 
 	const FChronogyLightFrame& Older = LightBuffer[Lo];
 	const FChronogyLightFrame& Newer = LightBuffer[Hi];
 	const float Range = Newer.Timestamp - Older.Timestamp;
 	const float Alpha = Range > KINDA_SMALL_NUMBER
-		? FMath::Clamp((Timestamp - Older.Timestamp) / Range, 0.f, 1.f)
-		: 1.f;
+							? FMath::Clamp((Timestamp - Older.Timestamp) / Range, 0.f, 1.f)
+							: 1.f;
 
 	OwnerLightComponent->SetIntensity(FMath::Lerp(Older.Intensity, Newer.Intensity, Alpha));
 	OwnerLightComponent->SetLightColor(FMath::Lerp(Older.LightColor, Newer.LightColor, Alpha));
@@ -573,7 +590,10 @@ void UChronogyComponent::ApplyLightAtTime(float Timestamp)
 
 void UChronogyComponent::ApplyMaterialAtTime(float Timestamp)
 {
-	if (!bSnapshotMaterialParameters || !OwnerDynMat || MaterialBuffer.Num() == 0) { return; }
+	if (!bSnapshotMaterialParameters || !OwnerDynMat || MaterialBuffer.Num() == 0)
+	{
+		return;
+	}
 
 	auto RestoreMaterial = [&](const FChronogyMaterialFrame& Frame)
 	{
@@ -585,7 +605,10 @@ void UChronogyComponent::ApplyMaterialAtTime(float Timestamp)
 
 	auto ApplyParams = [&](const FChronogyMaterialFrame& Frame)
 	{
-		if (!OwnerDynMat) { return; }
+		if (!OwnerDynMat)
+		{
+			return;
+		}
 		for (int32 i = 0; i < DetectedScalarParams.Num(); i++)
 			if (Frame.ScalarValues.IsValidIndex(i))
 				OwnerDynMat->SetScalarParameterValue(DetectedScalarParams[i], Frame.ScalarValues[i]);
@@ -594,23 +617,33 @@ void UChronogyComponent::ApplyMaterialAtTime(float Timestamp)
 				OwnerDynMat->SetVectorParameterValue(DetectedVectorParams[i], Frame.VectorValues[i]);
 	};
 
-	if (Timestamp <= MaterialBuffer[0].Timestamp) { RestoreMaterial(MaterialBuffer[0]); ApplyParams(MaterialBuffer[0]); return; }
-	if (Timestamp >= MaterialBuffer.Last().Timestamp) { return; }
+	if (Timestamp <= MaterialBuffer[0].Timestamp)
+	{
+		RestoreMaterial(MaterialBuffer[0]);
+		ApplyParams(MaterialBuffer[0]);
+		return;
+	}
+	if (Timestamp >= MaterialBuffer.Last().Timestamp)
+	{
+		return;
+	}
 
 	int32 Lo = 0, Hi = static_cast<int32>(MaterialBuffer.Num()) - 1;
 	while (Lo + 1 < Hi)
 	{
 		const int32 Mid = (Lo + Hi) / 2;
-		if (MaterialBuffer[Mid].Timestamp <= Timestamp) Lo = Mid;
-		else Hi = Mid;
+		if (MaterialBuffer[Mid].Timestamp <= Timestamp)
+			Lo = Mid;
+		else
+			Hi = Mid;
 	}
 
 	const FChronogyMaterialFrame& Older = MaterialBuffer[Lo];
 	const FChronogyMaterialFrame& Newer = MaterialBuffer[Hi];
 	const float Range = Newer.Timestamp - Older.Timestamp;
 	const float Alpha = Range > KINDA_SMALL_NUMBER
-		? FMath::Clamp((Timestamp - Older.Timestamp) / Range, 0.f, 1.f)
-		: 1.f;
+							? FMath::Clamp((Timestamp - Older.Timestamp) / Range, 0.f, 1.f)
+							: 1.f;
 
 	RestoreMaterial(Older);
 
@@ -648,10 +681,16 @@ void UChronogyComponent::EraseFutureSnapshots(float FromTimestamp)
 
 void UChronogyComponent::PlayBonePoseSnapshots()
 {
-	if (!bSnapshotBonePoses || BonePoseBuffer.Num() < 2) { return; }
+	if (!bSnapshotBonePoses || BonePoseBuffer.Num() < 2)
+	{
+		return;
+	}
 
 	UAnimInstance* AnimInst = GetAnimInstance();
-	if (!AnimInst) { return; }
+	if (!AnimInst)
+	{
+		return;
+	}
 
 	// Clamp to oldest recorded pose
 	if (RewindPlaybackTime <= BonePoseBuffer[0].Timestamp)
@@ -672,8 +711,10 @@ void UChronogyComponent::PlayBonePoseSnapshots()
 	while (Lo + 1 < Hi)
 	{
 		const int32 Mid = (Lo + Hi) / 2;
-		if (BonePoseBuffer[Mid].Timestamp <= RewindPlaybackTime) Lo = Mid;
-		else Hi = Mid;
+		if (BonePoseBuffer[Mid].Timestamp <= RewindPlaybackTime)
+			Lo = Mid;
+		else
+			Hi = Mid;
 	}
 
 	const FChronogyPoseSnapshot& Older = BonePoseBuffer[Lo];
@@ -681,8 +722,8 @@ void UChronogyComponent::PlayBonePoseSnapshots()
 
 	const float Range = Newer.Timestamp - Older.Timestamp;
 	const float Alpha = Range > KINDA_SMALL_NUMBER
-		? FMath::Clamp((RewindPlaybackTime - Older.Timestamp) / Range, 0.f, 1.f)
-		: 1.f;
+							? FMath::Clamp((RewindPlaybackTime - Older.Timestamp) / Range, 0.f, 1.f)
+							: 1.f;
 
 	FPoseSnapshot BlendedPose = Newer.PoseSnapshot;
 	const int32 BoneCount = FMath::Min(
@@ -714,14 +755,19 @@ void UChronogyComponent::DiscoverParticleComponents()
 	const float Now = Subsystem ? Subsystem->GetTimelineSeconds() : GetWorld()->GetRealTimeSeconds();
 	for (UNiagaraComponent* C : Comps)
 	{
-		if (!C) { continue; }
+		if (!C)
+		{
+			continue;
+		}
 
 		FChronogyParticleTrack& Track = ParticleTracks.AddDefaulted_GetRef();
-		Track.Component  = C;
-		Track.Mode       = DefaultParticleRewindMode;
+		Track.Component = C;
+		Track.Mode = DefaultParticleRewindMode;
 		Track.bWasActive = C->IsActive();
-		Track.BirthTime  = Track.bWasActive ? Now : -1.f;
-		Track.DeathAge   = -1.f;
+		Track.BirthTime = Track.bWasActive ? Now : -1.f;
+		Track.DeathAge = -1.f;
+		Track.MaxScrubAge = ParticleMaxScrubSeconds;
+		Track.bOwnerAutoActivate = C->bAutoActivate;
 
 		// Put Scrub systems into solo + DesiredAge now and keep them there for their whole life.
 		// Their age is driven from the rewind clock every frame — up in forward play, down in

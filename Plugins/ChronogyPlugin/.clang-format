@@ -1,0 +1,63 @@
+# Unreal Engine coding standard
+# https://docs.unrealengine.com/coding-standard
+Language: Cpp
+Standard: Cpp20
+BasedOnStyle: LLVM
+
+# Indentation: real tabs, 4-wide
+UseTab: ForContinuationAndIndentation
+TabWidth: 4
+IndentWidth: 4
+ContinuationIndentWidth: 4
+AccessModifierOffset: -4
+NamespaceIndentation: All
+
+# Braces: Allman
+BreakBeforeBraces: Allman
+
+# Pointers/references bind to the type: FFoo* Bar
+PointerAlignment: Left
+DerivePointerAlignment: false
+
+# Line width: UE does not hard-wrap
+ColumnLimit: 0
+ReflowComments: false
+
+# Spacing
+SpaceBeforeParens: ControlStatements
+SpacesInParentheses: false
+SpacesInAngles: false
+SpaceAfterCStyleCast: false
+Cpp11BracedListStyle: true
+
+# Short blocks stay expanded
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortBlocksOnASingleLine: Empty
+
+# Case labels indented under switch
+IndentCaseLabels: true
+
+# Constructor initializer lists
+BreakConstructorInitializers: BeforeComma
+ConstructorInitializerAllOnOneLineOrOnePerLine: false
+
+# Includes: preserve UE ordering
+SortIncludes: false
+IncludeBlocks: Preserve
+
+# Alignment
+AlignTrailingComments: true
+AlignAfterOpenBracket: DontAlign
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+AlignEscapedNewlines: Left
+
+# Empty lines
+KeepEmptyLinesAtTheStartOfBlocks: false
+MaxEmptyLinesToKeep: 1
+
+# Templates
+AlwaysBreakTemplateDeclarations: Yes

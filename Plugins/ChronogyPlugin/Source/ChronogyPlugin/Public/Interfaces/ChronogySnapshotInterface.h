@@ -6,7 +6,6 @@
 #include "UObject/Interface.h"
 #include "ChronogySnapshotInterface.generated.h"
 
-
 /*
 Serves as an escape hatch incase there is some custom functionality I want to implement later without adding to the component
 */
@@ -25,7 +24,6 @@ class CHRONOGYPLUGIN_API IChronogySnapshotInterface
 	GENERATED_BODY()
 
 public:
-
 	// Called at each snapshot interval during normal play. Store current state into your buffer.
 	virtual void CaptureSnapshot() = 0;
 

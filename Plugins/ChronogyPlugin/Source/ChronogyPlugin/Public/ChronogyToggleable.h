@@ -19,7 +19,7 @@ struct FChronogyToggleableFrame
 	GENERATED_BODY()
 
 	float Timestamp = 0.0f;
-	bool  bIsOn     = false;
+	bool bIsOn = false;
 };
 
 UCLASS()
@@ -39,7 +39,10 @@ public:
 	void SetToggleState(bool bNewState);
 
 	UFUNCTION(BlueprintPure, Category = "Chronogy|Toggleable")
-	bool IsOn() const { return bIsOn; }
+	bool IsOn() const
+	{
+		return bIsOn;
+	}
 
 	// Fires whenever the toggle state changes — during normal play and during rewind.
 	UPROPERTY(BlueprintAssignable, Category = "Chronogy|Toggleable")

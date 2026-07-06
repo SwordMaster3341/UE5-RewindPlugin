@@ -33,7 +33,7 @@ struct FChronogyDestructableStateFrame
 	GENERATED_BODY()
 
 	float Timestamp = 0.0f;
-	bool  bFractured = false;
+	bool bFractured = false;
 };
 
 // Bulk per-fragment transforms (relative to the actor root), recorded only while fractured.
@@ -44,7 +44,7 @@ struct FChronogyDestructableTransformFrame
 {
 	GENERATED_BODY()
 
-	float              Timestamp = 0.0f;
+	float Timestamp = 0.0f;
 	TArray<FTransform> FragmentTransforms;
 };
 
@@ -70,7 +70,10 @@ public:
 	void TriggerDestructionWithImpulse(FVector Origin, float Strength);
 
 	UFUNCTION(BlueprintPure, Category = "Chronogy|Destructable")
-	bool IsFractured() const { return bFractured; }
+	bool IsFractured() const
+	{
+		return bFractured;
+	}
 
 protected:
 	virtual void BeginPlay() override;
@@ -112,10 +115,10 @@ protected:
 private:
 	void CreateFragmentComponents();
 	void SetFragmentsSimulating(bool bSimulate);
-	void ShowFragments(bool bShow);          // toggles intact mesh vs fragment visibility + collision
-	void RestoreRestState();                 // snap fragments to rest, show intact mesh, physics off
+	void ShowFragments(bool bShow); // toggles intact mesh vs fragment visibility + collision
+	void RestoreRestState();        // snap fragments to rest, show intact mesh, physics off
 	void ApplyFracturedTransforms(float Timestamp);
-	void RestoreFragmentVelocities();        // estimate velocity from the last two frames on resume
+	void RestoreFragmentVelocities(); // estimate velocity from the last two frames on resume
 	bool IsFracturedAtTime(float Timestamp) const;
 
 	UFUNCTION()
@@ -124,15 +127,15 @@ private:
 	UPROPERTY()
 	TArray<TObjectPtr<UStaticMeshComponent>> FragmentComponents;
 
-	TArray<FTransform>                   RestRelativeTransforms; // frame 0, fragment-local relative to root
-	TArray<FChronogyDestructableStateFrame>     StateBuffer;      // step-function, appended on change only — not count-capped
+	TArray<FTransform> RestRelativeTransforms;                        // frame 0, fragment-local relative to root
+	TArray<FChronogyDestructableStateFrame> StateBuffer;              // step-function, appended on change only — not count-capped
 	TRingBuffer<FChronogyDestructableTransformFrame> TransformBuffer; // bulk per-fragment transforms, fixed window
 
 	UPROPERTY()
 	TObjectPtr<UChronogySubsystem> Subsystem;
 
-	bool  bFractured              = false;
-	bool  bFragmentsVisible       = false;
-	bool  bIntactSimulatesPhysics = false; // designer intent captured at BeginPlay
-	float FractureTimestamp       = 0.0f;
+	bool bFractured = false;
+	bool bFragmentsVisible = false;
+	bool bIntactSimulatesPhysics = false; // designer intent captured at BeginPlay
+	float FractureTimestamp = 0.0f;
 };

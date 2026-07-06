@@ -123,11 +123,11 @@ void AChronogyDestructable::TriggerDestructionWithImpulse(FVector Origin, float 
 
 	// Carry the cube's motion into the fragments so a falling/moving cube doesn't shatter in mid-air
 	// from a dead stop.
-	const bool    bRootWasSimulating = IntactMesh && IntactMesh->IsSimulatingPhysics();
-	const FVector InheritedLinVel    = bRootWasSimulating ? IntactMesh->GetPhysicsLinearVelocity() : FVector::ZeroVector;
-	const FVector InheritedAngVel    = bRootWasSimulating ? IntactMesh->GetPhysicsAngularVelocityInRadians() : FVector::ZeroVector;
+	const bool bRootWasSimulating = IntactMesh && IntactMesh->IsSimulatingPhysics();
+	const FVector InheritedLinVel = bRootWasSimulating ? IntactMesh->GetPhysicsLinearVelocity() : FVector::ZeroVector;
+	const FVector InheritedAngVel = bRootWasSimulating ? IntactMesh->GetPhysicsAngularVelocityInRadians() : FVector::ZeroVector;
 
-	bFractured        = true;
+	bFractured = true;
 	FractureTimestamp = Subsystem ? Subsystem->GetTimelineSeconds() : GetWorld()->GetRealTimeSeconds();
 
 	// Reassemble the fragments at the cube's CURRENT pose before breaking. While intact they are
@@ -176,7 +176,7 @@ void AChronogyDestructable::CaptureSnapshot()
 	if (StateBuffer.Num() == 0 || StateBuffer.Last().bFractured != bFractured)
 	{
 		FChronogyDestructableStateFrame& State = StateBuffer.AddDefaulted_GetRef();
-		State.Timestamp  = Now;
+		State.Timestamp = Now;
 		State.bFractured = bFractured;
 	}
 
@@ -200,8 +200,8 @@ void AChronogyDestructable::CaptureSnapshot()
 		// Actor-relative, computed from world (see FChronogyDestructableTransformFrame). Manual rather than
 		// GetRelativeTransform() because physics simulation detaches the fragment from the parent chain.
 		Frame.FragmentTransforms[i] = FragmentComponents[i]
-			? FragmentComponents[i]->GetComponentTransform().GetRelativeTransform(ActorTM)
-			: FTransform::Identity;
+										  ? FragmentComponents[i]->GetComponentTransform().GetRelativeTransform(ActorTM)
+										  : FTransform::Identity;
 	}
 }
 
@@ -285,8 +285,8 @@ void AChronogyDestructable::ApplyFracturedTransforms(float Timestamp)
 	// every fragment transform. Fall back to the newer frame.
 	const float Range = Newer.Timestamp - Older.Timestamp;
 	const float Alpha = Range > KINDA_SMALL_NUMBER
-		? FMath::Clamp((Timestamp - Older.Timestamp) / Range, 0.f, 1.f)
-		: 1.f;
+							? FMath::Clamp((Timestamp - Older.Timestamp) / Range, 0.f, 1.f)
+							: 1.f;
 
 	for (int32 i = 0; i < FragmentComponents.Num(); ++i)
 	{
@@ -296,8 +296,8 @@ void AChronogyDestructable::ApplyFracturedTransforms(float Timestamp)
 		}
 
 		const FVector BlendedLocation = FMath::Lerp(Older.FragmentTransforms[i].GetLocation(), Newer.FragmentTransforms[i].GetLocation(), Alpha);
-		const FQuat   BlendedRotation = FQuat::Slerp(Older.FragmentTransforms[i].GetRotation(), Newer.FragmentTransforms[i].GetRotation(), Alpha);
-		const FVector Scale           = Older.FragmentTransforms[i].GetScale3D();
+		const FQuat BlendedRotation = FQuat::Slerp(Older.FragmentTransforms[i].GetRotation(), Newer.FragmentTransforms[i].GetRotation(), Alpha);
+		const FVector Scale = Older.FragmentTransforms[i].GetScale3D();
 
 		const FTransform BlendedRelative(BlendedRotation, BlendedLocation, Scale);
 		FragmentComponents[i]->SetWorldTransform(BlendedRelative * ActorTM, false, nullptr, ETeleportType::TeleportPhysics);
@@ -447,7 +447,7 @@ void AChronogyDestructable::RestoreFragmentVelocities()
 		FQuat DeltaQuat = Newer.FragmentTransforms[i].GetRotation() * Older.FragmentTransforms[i].GetRotation().Inverse();
 		DeltaQuat.Normalize();
 		FVector Axis;
-		float   Angle;
+		float Angle;
 		DeltaQuat.ToAxisAndAngle(Axis, Angle);
 		if (Angle > PI)
 		{

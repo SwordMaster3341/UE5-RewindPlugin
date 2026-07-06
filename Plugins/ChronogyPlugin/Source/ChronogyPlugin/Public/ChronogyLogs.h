@@ -7,7 +7,10 @@
 class CHRONOGYPLUGIN_API FLogCategoryLogChronogy : public FLogCategory<ELogVerbosity::Log, ELogVerbosity::All>
 {
 public:
-	FORCEINLINE FLogCategoryLogChronogy() : FLogCategory(TEXT("LogChronogy")) {}
+	FORCEINLINE FLogCategoryLogChronogy()
+		: FLogCategory(TEXT("LogChronogy"))
+	{
+	}
 };
 extern CHRONOGYPLUGIN_API FLogCategoryLogChronogy LogChronogy;
 

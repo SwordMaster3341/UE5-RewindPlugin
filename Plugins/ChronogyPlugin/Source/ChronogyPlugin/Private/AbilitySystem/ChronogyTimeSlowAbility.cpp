@@ -2,40 +2,41 @@
 
 #include "AbilitySystem/ChronogyTimeSlowAbility.h"
 #include "ChronogySubsystem.h"
-#include "GameFramework/PlayerController.h"
 
+//Activates ChronogyTimeSlowAbility, setting the global time dilation in the ChronogySubsystem and adjusting the avatar's CustomTimeDilation
 void UChronogyTimeSlowAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
-    Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
+	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
-    if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
-    {
-        EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-        return;
-    }
+	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
+	{
+		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+		return;
+	}
 
-    if (UChronogySubsystem* Subsystem = GetWorld()->GetSubsystem<UChronogySubsystem>())
-    {
-        Subsystem->SetTimeDilation(TimeDilation);
-    }
+	if (UChronogySubsystem* Subsystem = GetWorld()->GetSubsystem<UChronogySubsystem>())
+	{
+		Subsystem->SetTimeDilation(TimeDilation);
+	}
 
-    if (APlayerController* PC = Cast<APlayerController>(ActorInfo->PlayerController.Get()))
-    {
-        PC->CustomTimeDilation = 1.0f / TimeDilation;
-    }
+	if (AActor* Avatar = ActorInfo->AvatarActor.Get())
+	{
+		Avatar->CustomTimeDilation = 1.0f / TimeDilation;
+	}
 }
 
+//Resets the global time dilation in the ChronogySubsystem and resets the avatar's CustomTimeDilation when the ability ends
 void UChronogyTimeSlowAbility::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
-    if (UChronogySubsystem* Subsystem = GetWorld()->GetSubsystem<UChronogySubsystem>())
-    {
-        Subsystem->ResetTimeDilation();
-    }
+	if (UChronogySubsystem* Subsystem = GetWorld()->GetSubsystem<UChronogySubsystem>())
+	{
+		Subsystem->ResetTimeDilation();
+	}
 
-    if (APlayerController* PC = Cast<APlayerController>(ActorInfo->PlayerController.Get()))
-    {
-        PC->CustomTimeDilation = 1.0f;
-    }
+	if (AActor* Avatar = ActorInfo->AvatarActor.Get())
+	{
+		Avatar->CustomTimeDilation = 1.0f;
+	}
 
-    Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
+	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
