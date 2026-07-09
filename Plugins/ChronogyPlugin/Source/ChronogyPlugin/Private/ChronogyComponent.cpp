@@ -128,11 +128,7 @@ void UChronogyComponent::BeginPlay()
 
 		Please note that every single rewindable has a hard cap of 2mb per snapshot.
 
-		You should almost never hit this cap, but if you do, the component will log a warning
-		and skip recording that snapshot to avoid crashing.
-
-		The best thing you can do is to reduce the memory footprint of the snapshot or potentially increase the MaxMemoryBytes variable
-		, but be aware that increasing memory usage can lead to performance issues and OOM crashes if taken too far.
+		This budget bounds the total size of each buffer by limiting how may snapshots it retains with the oldest snapshot dropping when the buffer is full.
 
 	*/
 
