@@ -47,6 +47,12 @@ There is a debugging suite, but it is done mostly through logs with no automated
 **Merging Animation and Skeletal Mesh Budget Cap**
 Currently, the animation and skeletal mesh each have their own individual memory budget adding up to 4 MB. This is unintended, and increases the allocation by 2mb for skeletal objects! While you should never hit this cap, it is worth a fix.
 
+**Reuse of Code**
+There is a duplicated binary search function inside:
+ApplySnapshotAtTime, ApplyLightAtTime, ApplyMaterialAtTime, PlayBonePoseSnapshots, ApplyFracturedTransforms, AChronogyToggleable::ApplySnapshot
+
+To replace with a template header
+
 
 ---
 
